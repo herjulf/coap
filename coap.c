@@ -99,6 +99,7 @@ typedef enum {
 
 /* CoAP content formats */
 typedef enum {
+  CONTENT_NOT_DEFINED = -1,
   TEXT_PLAIN = 0,
   TEXT_XML = 1,
   TEXT_CSV = 2,
@@ -286,7 +287,7 @@ void terminate(char *s)
 }
  
 int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
-	      char *uri_query, char *payload)
+	      char *uri_query, int content, char *payload)
 {
   int len = 0;
 
@@ -324,13 +325,15 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     }
   }
 
-  ch_os = (struct coap_opt_s*) &buf[len];
-  ch_os->delta = 1; /* COAP_OPTION_CONTENT_FORMAT = 12 */
-  ch_os->len = 1;
-  len++;
-  buf[len] = APPLICATION_LINK_FORMAT; 
-  len++;
-  
+  if( content != CONTENT_NOT_DEFINED) {
+    ch_os = (struct coap_opt_s*) &buf[len];
+    ch_os->delta = 1; /* COAP_OPTION_CONTENT_FORMAT = 12 */
+    ch_os->len = 1;
+    len++;
+    buf[len] = content;
+    len++;
+  }  
+
   if(uri_query) {
     ch_os = (struct coap_opt_s*) &buf[len];
     ch_os->delta = 3; /* COAP_OPTION_URI_QUERY = 15 */
@@ -398,17 +401,18 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
       /* DISCOVER */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, broker_base_uri);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, APPLICATION_LINK_FORMAT,
+			     broker_base_uri);
       }	
 
       /* CREATE */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_POST)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, NULL);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
       }	
 
       /* SUBSCRIBE -- PUT OR POST */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, NULL);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
       }	
 
       if(send_len) {
