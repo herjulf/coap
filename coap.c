@@ -398,12 +398,12 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
       /* DISCOVER */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, xx, broker_base_uri);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, broker_base_uri);
       }	
 
       /* CREATE */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_POST)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, discover, xx, broker_base_uri);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, NULL);
       }	
 
       /* SUBSCRIBE -- PUT OR POST */
@@ -424,4 +424,3 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     close(s);
     return 0;
 }
-
