@@ -22,18 +22,21 @@
 #define BROKER_BASE_URI "</ps/>;rt=\"core.ps\";ct=40"
 char *broker_base_uri = BROKER_BASE_URI;
 
+char *xx = "\"core.ps\"";
+
+
 #define MAX_URI_LEN 50
 char uri[MAX_URI_LEN];
 
-/* CoAP message types */
+/* CoAP types */
 typedef enum {
   COAP_TYPE_CON,         /* confirm*/
   COAP_TYPE_NON,         /* non-confirm */
   COAP_TYPE_ACK,         /* ack */
   COAP_TYPE_RST          /* reset */
-} coap_message_t;
+} coap_type_t;
 
-/* CoAP request method codes */
+/* CoAP requests */
 typedef enum {
 COAP_GET = 1,
   COAP_POST,
@@ -41,7 +44,7 @@ COAP_GET = 1,
   COAP_DELETE
   } coap_request_t;
 
-/* CoAP response codes */
+/* CoAP responses */
 typedef enum {
   NO_ERROR = 0,
   CREATED_2_01 = 65,            /* CREATED */
@@ -71,7 +74,7 @@ typedef enum {
 
 } coap_response_t;
 
-/* CoAP header option numbers */
+/* CoAP options */
 typedef enum {
   COAP_OPTION_IF_MATCH = 1,     /* 0-8 B */
   COAP_OPTION_URI_HOST = 3,     /* 1-255 B */
@@ -94,7 +97,7 @@ typedef enum {
   COAP_OPTION_SIZE1 = 60,       /* 0-4 B */
 } coap_option_t;
 
-/* CoAP Content-Formats */
+/* CoAP content formats */
 typedef enum {
   TEXT_PLAIN = 0,
   TEXT_XML = 1,
@@ -252,11 +255,13 @@ void dump_pkt(struct coap_hdr *ch, int len)
     if( olen ) {
       if(opt == COAP_OPTION_URI_PATH) {
 	unsigned ii;
+	printf("uri-path=");
 	for(ii = 1; ii <= olen; ii++) 
 	  printf("%c", d[ii+i]);
       }
       else if(opt == COAP_OPTION_URI_QUERY) {
 	unsigned ii;
+	printf("uri-query=");
 	for(ii = 1; ii <= olen; ii++) 
 	  printf("%c", d[ii+i]);
       }
@@ -280,14 +285,14 @@ void terminate(char *s)
     exit(1);
 }
  
-int do_packet(char *buf, unsigned char type, unsigned char code, char *uri, char *payload)
+int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
+	      char *uri_query, char *payload)
 {
   int len = 0;
 
   struct coap_hdr *ch_tx;
   struct coap_opt_s *ch_os;
   struct coap_opt_l *ch_ol;
-  char *xx = "\"core.ps\"";
   
   ch_tx = (struct coap_hdr*) &buf[0];
   len = sizeof(struct coap_hdr);
@@ -326,12 +331,14 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri, char
   buf[len] = APPLICATION_LINK_FORMAT; 
   len++;
   
-  ch_os = (struct coap_opt_s*) &buf[len];
-  ch_os->delta = 3; /* COAP_OPTION_URI_QUERY = 15 */
-  ch_os->len = strlen(xx);
-  len++;
-  strcpy(&buf[len], xx); /* Short opt */
-  len += strlen(xx);
+  if(uri_query) {
+    ch_os = (struct coap_opt_s*) &buf[len];
+    ch_os->delta = 3; /* COAP_OPTION_URI_QUERY = 15 */
+    ch_os->len = strlen(uri_query);
+    len++;
+    strcpy(&buf[len], uri_query); /* Short opt */
+    len += strlen(uri_query);
+  }
 
   if(payload) {
     buf[len] = 0xff;
@@ -370,6 +377,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri, char
     while(1)
     {
       memset((char *) &buf, 0, sizeof(buf));
+      send_len = 0;
 
       if ((recv_len = recvfrom(s, buf, BUFLEN, 0, 
 			       (struct sockaddr *) &si_other, &slen)) == -1) {
@@ -390,26 +398,28 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri, char
 
       /* DISCOVER */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, broker_base_uri);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, xx, broker_base_uri);
       }	
 
       /* CREATE */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_POST)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, discover, broker_base_uri);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, discover, xx, broker_base_uri);
       }	
 
       /* SUBSCRIBE -- PUT OR POST */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, NULL);
       }	
 
-      if(debug & D_COAP_PKT)
-	dump_pkt(co, send_len);
-
+      if(send_len) {
+	if(debug & D_COAP_PKT)
+	  dump_pkt(co, send_len);
+	
         if (sendto(s, buf, send_len, 0, (struct sockaddr*) &si_other, 
 		   slen) == -1)  {
 	  terminate("sendto()");
         }
+      }
     }
     close(s);
     return 0;
