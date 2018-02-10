@@ -24,7 +24,6 @@ char *broker_base_uri = BROKER_BASE_URI;
 
 char *xx = "\"core.ps\"";
 
-
 #define MAX_URI_LEN 50
 char uri[MAX_URI_LEN];
 
@@ -126,7 +125,7 @@ typedef enum {
 
 
 unsigned int debug = 3;
-int date, utime, utc;
+int date = 1, utime, utc;
 
 struct udp_hdr {
  unsigned short int sport;
@@ -307,7 +306,7 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
       }
       else if(opt == 15) {
 	unsigned ii; /* Payload */
-	for(ii = 1; ii <= olen; ii++) 
+	for(ii = 0; ii <= olen; ii++) 
 	  *p++ =  d[ii+i];
 	*p++ = 0;
 	return;
