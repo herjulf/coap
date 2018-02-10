@@ -280,6 +280,79 @@ void dump_pkt(struct coap_hdr *ch, int len)
   }
 }
 
+void parse_subscribe(struct coap_hdr *ch, int len, char *p)
+{
+  int i;
+  char *d = (char *) ch; 
+  unsigned opt = 0, old_opt = 0;
+
+  for(i = 4; i < len; i++) {
+    unsigned olen;
+
+    /* Option delta handling */
+    opt = (d[i]>>4) & 0xF;
+
+    if(opt > 12 ) {
+      if(opt == 13) {
+	i++;
+	opt = d[i] + 13;
+      }
+      else if(opt == 14) {
+	printf("KALLE UNTESTED OPT 14\n");
+	i++;
+	opt = d[i]<<8;
+	i++;
+	opt += d[i];
+	opt += 269;
+      }
+      else if(opt == 15) {
+	unsigned ii; /* Payload */
+	for(ii = 1; ii <= olen; ii++) 
+	  *p++ =  d[ii+i];
+	*p++ = 0;
+	return;
+      }
+    }
+    opt += old_opt;
+    
+    olen = (d[i]) & 0xF; 
+    if(olen > 12 ) {
+      if(olen == 13) {
+	i++;
+	olen = d[i] + 13;
+      }
+      else if(olen == 14) {
+	printf("UNTESTED OLEN 14\n");
+	i++;
+	olen = d[i]<<8;
+	i++;
+	olen += d[i];
+	olen += 269;
+      }
+      else if(olen == 15) {
+	printf("ERR OPT FORMAT LEN=15\n");
+      }
+    }
+
+    printf("KALLE Options: opt=%u, len=%u ", opt, olen);
+
+    if( olen ) {
+      if(opt == COAP_OPTION_URI_PATH) {
+	unsigned ii;
+	for(ii = 1; ii <= olen; ii++) 
+	  *p++ =  d[ii+i];
+      }
+      else if(opt == COAP_OPTION_URI_QUERY) {
+	unsigned ii;
+	for(ii = 1; ii <= olen; ii++) 
+	  *p++ =  d[ii+i];
+      }
+      old_opt = opt;
+      i = i + olen;
+    }
+  }
+}
+
 void terminate(char *s)
 {
     perror(s);
@@ -358,7 +431,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     int s , recv_len, send_len;
     socklen_t slen = sizeof(si_other);
 
-    char buf[BUFLEN];
+    char buf[BUFLEN], p[BUFLEN];
     struct coap_hdr *co;
     //char *discover = "</ps/>;rt=core.ps";
     char *discover = "</ps/>";
@@ -380,6 +453,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     while(1)
     {
       memset((char *) &buf, 0, sizeof(buf));
+      memset((char *) &p, 0, sizeof(p));
       send_len = 0;
 
       if ((recv_len = recvfrom(s, buf, BUFLEN, 0, 
@@ -412,6 +486,13 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
       /* SUBSCRIBE -- PUT OR POST */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
+	parse_subscribe(co, recv_len, p);
+	
+	print_date(p); 
+	printf("PL1=%s ", p);
+
+	printf("PL2=%s\n", p);
+
 	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
       }	
 
