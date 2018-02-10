@@ -305,10 +305,14 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
 	opt += 269;
       }
       else if(opt == 15) {
-	unsigned ii; /* Payload */
-	for(ii = 0; ii <= olen; ii++) 
+	unsigned ii; /* Payload string */
+	//printf("PAYLOAD=%s\n", &d[i+1]);
+	strncpy(p, &d[i+1], strlen(&d[i+1]));
+#if 0
+	for(ii = 1; ii <= olen; ii++) 
 	  *p++ =  d[ii+i];
 	*p++ = 0;
+#endif
 	return;
       }
     }
@@ -487,7 +491,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
 
 	print_date(p); 
-	printf("PL1=%s ", p);
+	printf("%s ", p);
 	parse_subscribe(co, recv_len, p);
 	printf("PL2=%s\n", p);
 
