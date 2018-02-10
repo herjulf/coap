@@ -486,11 +486,10 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
       /* SUBSCRIBE -- PUT OR POST */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
-	parse_subscribe(co, recv_len, p);
-	
+
 	print_date(p); 
 	printf("PL1=%s ", p);
-
+	parse_subscribe(co, recv_len, p);
 	printf("PL2=%s\n", p);
 
 	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
