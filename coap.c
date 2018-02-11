@@ -124,7 +124,7 @@ typedef enum {
 } coap_content_t;
 
 
-unsigned int debug = 3;
+unsigned int debug = 0;
 int date = 1, utime, utc;
 
 struct udp_hdr {
@@ -305,14 +305,8 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
 	opt += 269;
       }
       else if(opt == 15) {
-	unsigned ii; /* Payload string */
-	//printf("PAYLOAD=%s\n", &d[i+1]);
+	*p++ = ' ';
 	strncpy(p, &d[i+1], strlen(&d[i+1]));
-#if 0
-	for(ii = 1; ii <= olen; ii++) 
-	  *p++ =  d[ii+i];
-	*p++ = 0;
-#endif
 	return;
       }
     }
@@ -337,8 +331,6 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
       }
     }
 
-    printf("KALLE Options: opt=%u, len=%u ", opt, olen);
-
     if( olen ) {
       if(opt == COAP_OPTION_URI_PATH) {
 	unsigned ii;
@@ -349,6 +341,7 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
 	unsigned ii;
 	for(ii = 1; ii <= olen; ii++) 
 	  *p++ =  d[ii+i];
+	//*p++ = ' ';
       }
       old_opt = opt;
       i = i + olen;
@@ -387,7 +380,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
       len++;
       strcpy(&buf[len], uri); /* Short opt */
       len += strlen(uri);
-      printf("SHORT delta=%d, len=%d\n", ch_os->delta, ch_os->len); 
+      if(debug & D_COAP_PKT)
+	printf("SHORT delta=%d, len=%d\n", ch_os->delta, ch_os->len); 
     }
     else if(strlen(uri) > 12) {
       ch_ol = (struct coap_opt_l*) &buf[len];
@@ -397,7 +391,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
       len += 2;
       strcpy(&buf[len], uri); /* Long opt */
       len += strlen(uri);
-      printf("LONG flg=%d , delta=%d, len=%d\n", ch_ol->flag, ch_ol->delta, ch_ol->len); 
+      if(debug & D_COAP_PKT)
+	printf("LONG flg=%d , delta=%d, len=%d\n", ch_ol->flag, ch_ol->delta, ch_ol->len); 
     }
   }
 
@@ -463,9 +458,11 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 			       (struct sockaddr *) &si_other, &slen)) == -1) {
 	terminate("recvfrom()");
       }
-         
-      printf("Got from %s:%d\n", inet_ntoa(si_other.sin_addr), 
-	     ntohs(si_other.sin_port));
+
+
+      if(debug & D_COAP_PKT)
+	printf("Got from %s:%d\n", inet_ntoa(si_other.sin_addr), 
+	       ntohs(si_other.sin_port));
 
       co = (struct coap_hdr*) &buf[0]; 
 
@@ -493,7 +490,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 	print_date(p); 
 	printf("%s ", p);
 	parse_subscribe(co, recv_len, p);
-	printf("PL2=%s\n", p);
+	printf("%s\n", p);
 
 	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
       }	
