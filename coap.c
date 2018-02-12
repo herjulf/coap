@@ -170,6 +170,7 @@ void usage(void)
   printf(" -d           debug\n");
   printf(" -ut          add Unix Time\n");
   printf(" -gmt         time in GMT\n");
+  exit(-1);
 }
 
 void print_date(char *datebuf)
@@ -266,7 +267,7 @@ void dump_pkt(struct coap_hdr *ch, int len)
       }
     }
 
-    printf("Options: opt=%u, len=%u ", opt, olen);
+    printf("Option: opt=%u, len=%u ", opt, olen);
 
     if( olen ) {
       if(opt == COAP_OPTION_URI_PATH) {
@@ -489,7 +490,7 @@ int process(void)
       }
 
       if(co->tkl > 8) {
-	terminate("CoAP version");
+	terminate("CoAP token length err");
       }
 
       /* Simple CoAP pubsub state machinery */
