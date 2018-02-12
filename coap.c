@@ -1,5 +1,5 @@
 /*
- * Copyright GPL by Robert Olsson rolss@kth.se/robert@radio-sensors.com
+ * Copyright GPL by Robert Olsson roolss@kth.se/robert@radio-sensors.com
  * Created : 2017-02-09
  */
 #include<stdio.h>
@@ -15,13 +15,11 @@
 #include<sys/socket.h>
 #include <signal.h>
 
+#define VERSION "1.0 2018-02-11"
 #define BUFLEN 512
+
 #define PORT 5683
-
 short port = PORT;
-
-#define VERSION "1.0 2018-02-10"
-//#define LOGFILE "/var/log/coap.dat"
 
 int file_fd;
 #define LOGFILE "./coap.dat"
@@ -55,29 +53,28 @@ COAP_GET = 1,
 /* CoAP responses */
 typedef enum {
   NO_ERROR = 0,
-  CREATED_2_01 = 65,            /* CREATED */
-  DELETED_2_02 = 66,            /* DELETED */
-  VALID_2_03 = 67,              /* NOT_MODIFIED */
-  CHANGED_2_04 = 68,            /* CHANGED */
-  CONTENT_2_05 = 69,            /* OK */
-  CONTINUE_2_31 = 95,           /* CONTINUE */
-  BAD_REQUEST_4_00 = 128,       /* BAD_REQUEST */
-  UNAUTHORIZED_4_01 = 129,      /* UNAUTHORIZED */
-  BAD_OPTION_4_02 = 130,        /* BAD_OPTION */
-  FORBIDDEN_4_03 = 131,         /* FORBIDDEN */
-  NOT_FOUND_4_04 = 132,         /* NOT_FOUND */
-  METHOD_NOT_ALLOWED_4_05 = 133,        /* METHOD_NOT_ALLOWED */
-  NOT_ACCEPTABLE_4_06 = 134,    /* NOT_ACCEPTABLE */
-  PRECONDITION_FAILED_4_12 = 140,       /* BAD_REQUEST */
-  REQUEST_ENTITY_TOO_LARGE_4_13 = 141,  /* REQUEST_ENTITY_TOO_LARGE */
-  UNSUPPORTED_MEDIA_TYPE_4_15 = 143,    /* UNSUPPORTED_MEDIA_TYPE */
-  INTERNAL_SERVER_ERROR_5_00 = 160,     /* INTERNAL_SERVER_ERROR */
-  NOT_IMPLEMENTED_5_01 = 161,   /* NOT_IMPLEMENTED */
-  BAD_GATEWAY_5_02 = 162,       /* BAD_GATEWAY */
-  SERVICE_UNAVAILABLE_5_03 = 163,       /* SERVICE_UNAVAILABLE */
-  GATEWAY_TIMEOUT_5_04 = 164,   /* GATEWAY_TIMEOUT */
-  PROXYING_NOT_SUPPORTED_5_05 = 165,    /* PROXYING_NOT_SUPPORTED */
-
+  CREATED_2_01 = 65,
+  DELETED_2_02 = 66,
+  VALID_2_03 = 67,
+  CHANGED_2_04 = 68,
+  CONTENT_2_05 = 69,
+  CONTINUE_2_31 = 95,
+  BAD_REQUEST_4_00 = 128,
+  UNAUTHORIZED_4_01 = 129,
+  BAD_OPTION_4_02 = 130,
+  FORBIDDEN_4_03 = 131,
+  NOT_FOUND_4_04 = 132,
+  METHOD_NOT_ALLOWED_4_05 = 133,
+  NOT_ACCEPTABLE_4_06 = 134,
+  PRECONDITION_FAILED_4_12 = 140,
+  REQUEST_ENTITY_TOO_LARGE_4_13 = 141,
+  UNSUPPORTED_MEDIA_TYPE_4_15 = 143,
+  INTERNAL_SERVER_ERROR_5_00 = 160,
+  NOT_IMPLEMENTED_5_01 = 161,
+  BAD_GATEWAY_5_02 = 162,
+  SERVICE_UNAVAILABLE_5_03 = 163,
+  GATEWAY_TIMEOUT_5_04 = 164,
+  PROXYING_NOT_SUPPORTED_5_05 = 165,
 } coap_response_t;
 
 /* CoAP options */
@@ -132,7 +129,7 @@ typedef enum {
 
 
 unsigned int debug = 0;
-int date = 1, utime =0, gmt=0, background;
+int date = 1, utime =0, gmt=0, background = 0;
 
 struct udp_hdr {
  unsigned short int sport;
@@ -149,13 +146,13 @@ struct coap_hdr {
   unsigned short id;
 };
 
-/* length < 15 for CoAP-07 and length < 13 for CoAP-13*/
+/* Option handling */
 struct coap_opt_s {
   unsigned int len:4;
   unsigned int delta:4;
 };
 
-/* extended form, to be used when length==15 */
+/* Option handling */
 struct coap_opt_l {
   unsigned int flag:4;  /* either 15 or 13 depending on the CoAP version */
   unsigned int delta:4; /* option type (expressed as delta) */
@@ -167,8 +164,12 @@ void usage(void)
   printf("\nVersion %s\n", VERSION);
   printf("\ncoap: A CoAP pubsub endpoint\n");
   printf("Usage: coap [-debug] [-p port] [-gmt] [-f file]\n");
-  printf(" -f file      Local logfile. Default is %s\n", LOGFILE);
+  printf(" -f file      local logfile. Default is %s\n", LOGFILE);
   printf(" -p port      TCP server port. Default %d\n", port);
+  printf(" -b           run in background\n");
+  printf(" -d           debug\n");
+  printf(" -ut          add Unix Time\n");
+  printf(" -gmt         time in GMT\n");
 }
 
 void print_date(char *datebuf)
@@ -407,7 +408,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
       strcpy(&buf[len], uri); /* Long opt */
       len += strlen(uri);
       if(debug & D_COAP_PKT)
-	printf("LONG flg=%d , delta=%d, len=%d\n", ch_ol->flag, ch_ol->delta, ch_ol->len); 
+	printf("LONG delta flg=%d , delta=%d, len=%d\n", ch_ol->flag, ch_ol->delta, ch_ol->len); 
     }
   }
 
@@ -491,6 +492,8 @@ int process(void)
 	terminate("CoAP version");
       }
 
+      /* Simple CoAP pubsub state machinery */
+
       /* DISCOVER */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
 	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, APPLICATION_LINK_FORMAT,
@@ -541,43 +544,24 @@ int process(void)
 int main(int ac, char *av[]) 
 {
   int i;
+  char *filename = LOGFILE;
 
-  char *filename = NULL;
-  background = 0;
-  date = 1;
-  gmt = 0;
-  filename = LOGFILE;
-
-#if 0
-  if(ac == 1) 
-    usage();
-#endif
-  
   for(i = 1; (i < ac) && (av[i][0] == '-'); i++)  {
 
-    if (strncmp(av[i], "-gmt", 2) == 0) 
+    if (strncmp(av[i], "-gmt", 3) == 0) 
       gmt = 1;
-
-    else if (strncmp(av[i], "-ut", 2) == 0) 
+    else if (strncmp(av[i], "-h", 2) == 0) 
+      usage();
+    else if (strncmp(av[i], "-ut", 3) == 0) 
       utime = 1;
-
     else if (strncmp(av[i], "-f", 2) == 0) 
       filename = av[++i];
-    
-    else if (strncmp(av[i], "-debug", 6) == 0) {
-      debug = 1;
-    }
-
-    else if (strncmp(av[i], "-port", 9) == 0) {
+    else if (strncmp(av[i], "-d", 6) == 0)
+      debug = 3;
+    else if (strncmp(av[i], "-p", 2) == 0)
       port = atoi(av[++i]);
-    }
     else if (strncmp(av[i], "-b", 2) == 0) 
       background = 1;
-
-#if 0
-    else
-      usage();
-#endif
   }
 
   if(debug) {
@@ -609,7 +593,6 @@ int main(int ac, char *av[])
     if (i > 0) 
       _exit(0); /* parent exits */
   
-
     setsid(); /* obtain a new process group */
     for (i = getdtablesize(); i >= 0; --i) {
       if(i == file_fd) continue;
