@@ -162,8 +162,11 @@ struct coap_opt_l {
 void usage(void)
 {
   printf("\nVersion %s\n", VERSION);
-  printf("\ncoap: A CoAP pubsub endpoint\n");
-  printf("Usage: coap [-debug] [-p port] [-gmt] [-f file]\n");
+  printf("\ncoap: A CoAP pubsub server/endpoint\n");
+  printf("\ncoap: * stores pubsub data in file\n");
+  printf("\ncoap: * easy prococol and option debugging\n");
+  printf("\ncoap: * GPL copyright\n");
+  printf("Usage: coap [-d] [-b] [-p port] [-gmt] [-u] [-f file]\n");
   printf(" -f file      local logfile. Default is %s\n", LOGFILE);
   printf(" -p port      TCP server port. Default %d\n", port);
   printf(" -b           run in background\n");
