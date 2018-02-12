@@ -18,6 +18,8 @@
 #define BUFLEN 512
 #define PORT 5683
 
+short port = PORT;
+
 #define VERSION "1.0 2018-02-10"
 //#define LOGFILE "/var/log/coap.dat"
 #define LOGFILE "./coap.dat"
@@ -128,7 +130,7 @@ typedef enum {
 
 
 unsigned int debug = 0;
-int date = 1, utime, utc, background;
+int date = 1, utime =0, gmt=0, background;
 
 struct udp_hdr {
  unsigned short int sport;
@@ -162,9 +164,9 @@ void usage(void)
 {
   printf("\nVersion %s\n", VERSION);
   printf("\ncoap: A CoAP pubsub endpoint\n");
-  printf("Usage: coap [-debug] [-p port] [-utc] [-f file]\n");
+  printf("Usage: coap [-debug] [-p port] [-gmt] [-f file]\n");
   printf(" -f file      Local logfile. Default is %s\n", LOGFILE);
-  printf(" -p port      TCP server port. Default %d\n", PORT);
+  printf(" -p port      TCP server port. Default %d\n", port);
 }
 
 void print_date(char *datebuf)
@@ -176,7 +178,7 @@ void print_date(char *datebuf)
   *datebuf = 0;
   time ( &raw_time );
 
-  if(utc)
+  if(gmt)
     tp = gmtime ( &raw_time );
   else
     tp = localtime ( &raw_time );
@@ -452,7 +454,7 @@ int process(void)
     memset((char *) &si_me, 0, sizeof(si_me));
      
     si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(PORT);
+    si_me.sin_port = htons(port);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
      
     if( bind(s , (struct sockaddr*)&si_me, sizeof(si_me) ) == -1) {
@@ -462,7 +464,7 @@ int process(void)
     while(1)
     {
       memset((char *) &buf, 0, sizeof(buf));
-      memset((char *) &p, 0, sizeof(p));
+
       send_len = 0;
 
       if ((recv_len = recvfrom(s, buf, BUFLEN, 0, 
@@ -501,8 +503,10 @@ int process(void)
       /* SUBSCRIBE -- PUT OR POST */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
 
+	memset((char *) &p, 0, sizeof(p));
 	print_date(p); 
 	printf("%s ", p);
+	memset((char *) &p, 0, sizeof(p));
 	parse_subscribe(co, recv_len, p);
 	printf("%s\n", p);
 
@@ -530,22 +534,25 @@ int main(int ac, char *av[])
   char *filename = NULL;
   background = 0;
   date = 1;
-  utime = 1;
-  utc = 0;
+  gmt = 0;
   filename = LOGFILE;
-  short port = PORT;
 
-
+#if 0
   if(ac == 1) 
     usage();
-
+#endif
+  
   for(i = 1; (i < ac) && (av[i][0] == '-'); i++)  {
-    if (strcmp(av[i], "-utc") == 0) 
-      utc = 1;
+
+    if (strncmp(av[i], "-gmt", 2) == 0) 
+      gmt = 1;
+
+    else if (strncmp(av[i], "-ut", 2) == 0) 
+      utime = 1;
 
     else if (strncmp(av[i], "-f", 2) == 0) 
       filename = av[++i];
-
+    
     else if (strncmp(av[i], "-debug", 6) == 0) {
       debug = 1;
     }
@@ -553,6 +560,9 @@ int main(int ac, char *av[])
     else if (strncmp(av[i], "-port", 9) == 0) {
       port = atoi(av[++i]);
     }
+    else if (strncmp(av[i], "-b", 2) == 0) 
+      background = 1;
+
 #if 0
     else
       usage();
@@ -561,6 +571,10 @@ int main(int ac, char *av[])
 
   if(debug) {
     printf("DEBUG port=%d\n", port);
+    printf("DEBUG GMT=%d\n", gmt);
+    printf("DEBUG Unix Time=%d\n", utime);
+    printf("DEBUG background=%d\n", background);
+    printf("DEBUG file=%s\n", filename);
   }
 
   if(filename) {
