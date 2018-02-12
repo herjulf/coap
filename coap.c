@@ -22,6 +22,8 @@ short port = PORT;
 
 #define VERSION "1.0 2018-02-10"
 //#define LOGFILE "/var/log/coap.dat"
+
+int file_fd;
 #define LOGFILE "./coap.dat"
 
 #define D_COAP_PKT      (1<<0)
@@ -504,11 +506,19 @@ int process(void)
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT)) {
 
 	memset((char *) &p, 0, sizeof(p));
+
 	print_date(p); 
-	printf("%s ", p);
+	if(file_fd)
+	  write(file_fd, p, strlen(p));
+	if(!background) 
+	  printf("%s ", p);
 	memset((char *) &p, 0, sizeof(p));
+
 	parse_subscribe(co, recv_len, p);
-	printf("%s\n", p);
+	if(file_fd)
+	  write(file_fd, p, strlen(p));
+	if(!background) 
+	  printf("%s ", p);
 
 	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
       }	
@@ -529,7 +539,7 @@ int process(void)
 
 int main(int ac, char *av[]) 
 {
-  int file_fd, i;
+  int i;
 
   char *filename = NULL;
   background = 0;
