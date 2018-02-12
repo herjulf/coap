@@ -5,15 +5,21 @@
 #include<stdio.h>
 #include<string.h> 
 #include<stdlib.h> 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
 
 #define BUFLEN 512
 #define PORT 5683
 
-#define VERSION "1.0 2018-02-09"
+#define VERSION "1.0 2018-02-10"
+//#define LOGFILE "/var/log/coap.dat"
+#define LOGFILE "./coap.dat"
 
 #define D_COAP_PKT      (1<<0)
 #define D_COAP_REPORT   (1<<1)
@@ -21,8 +27,6 @@
 
 #define BROKER_BASE_URI "</ps/>;rt=\"core.ps\";ct=40"
 char *broker_base_uri = BROKER_BASE_URI;
-
-char *xx = "\"core.ps\"";
 
 #define MAX_URI_LEN 50
 char uri[MAX_URI_LEN];
@@ -52,7 +56,6 @@ typedef enum {
   CHANGED_2_04 = 68,            /* CHANGED */
   CONTENT_2_05 = 69,            /* OK */
   CONTINUE_2_31 = 95,           /* CONTINUE */
-
   BAD_REQUEST_4_00 = 128,       /* BAD_REQUEST */
   UNAUTHORIZED_4_01 = 129,      /* UNAUTHORIZED */
   BAD_OPTION_4_02 = 130,        /* BAD_OPTION */
@@ -63,7 +66,6 @@ typedef enum {
   PRECONDITION_FAILED_4_12 = 140,       /* BAD_REQUEST */
   REQUEST_ENTITY_TOO_LARGE_4_13 = 141,  /* REQUEST_ENTITY_TOO_LARGE */
   UNSUPPORTED_MEDIA_TYPE_4_15 = 143,    /* UNSUPPORTED_MEDIA_TYPE */
-
   INTERNAL_SERVER_ERROR_5_00 = 160,     /* INTERNAL_SERVER_ERROR */
   NOT_IMPLEMENTED_5_01 = 161,   /* NOT_IMPLEMENTED */
   BAD_GATEWAY_5_02 = 162,       /* BAD_GATEWAY */
@@ -125,7 +127,7 @@ typedef enum {
 
 
 unsigned int debug = 0;
-int date = 1, utime, utc;
+int date = 1, utime, utc, background;
 
 struct udp_hdr {
  unsigned short int sport;
@@ -154,6 +156,15 @@ struct coap_opt_l {
   unsigned int delta:4; /* option type (expressed as delta) */
   unsigned int len:8;   /* MAX_URI_LEN = 50 so one byte is enough for extended length */
 };
+
+void usage(void)
+{
+  printf("\nVersion %s\n", VERSION);
+  printf("\ncoap: A CoAP pubsub endpoint\n");
+  printf("Usage: coap [-debug] [-p port] [-utc] [-f file]\n");
+  printf(" -f file      Local logfile. Default is %s\n", LOGFILE);
+  printf(" -p port      TCP server port. Default %d\n", PORT);
+}
 
 void print_date(char *datebuf)
 {
@@ -190,7 +201,6 @@ void dump_pkt(struct coap_hdr *ch, int len)
 
   printf("COAP DUMP pkt lengh=%d\n", len); 
   printf("v=%u t=%u tkl=%u code=%u id=%x\n", ch->ver, ch->type, ch->tkl, ch->code, ch->id);
-
 
   for(i = 0; i < len; i++) {
     if(!i) 
@@ -297,7 +307,7 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
 	opt = d[i] + 13;
       }
       else if(opt == 14) {
-	printf("KALLE UNTESTED OPT 14\n");
+	printf("UNTESTED OPT 14\n");
 	i++;
 	opt = d[i]<<8;
 	i++;
@@ -423,7 +433,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   return len;
 }
 
-  int main(void)
+int process(void)
 {
     struct sockaddr_in si_me, si_other;
     int s , recv_len, send_len;
@@ -459,7 +469,6 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 	terminate("recvfrom()");
       }
 
-
       if(debug & D_COAP_PKT)
 	printf("Got from %s:%d\n", inet_ntoa(si_other.sin_addr), 
 	       ntohs(si_other.sin_port));
@@ -470,6 +479,10 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 	dump_pkt(co, recv_len);
 
       if(co->ver != 1) {
+	terminate("CoAP version err");
+      }
+
+      if(co->tkl > 8) {
 	terminate("CoAP version");
       }
 
@@ -507,4 +520,81 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     }
     close(s);
     return 0;
+}
+
+int main(int ac, char *av[]) 
+{
+  int file_fd, i;
+
+  char *filename = NULL;
+  background = 0;
+  date = 1;
+  utime = 1;
+  utc = 0;
+  filename = LOGFILE;
+  short port = PORT;
+
+
+  if(ac == 1) 
+    usage();
+
+  for(i = 1; (i < ac) && (av[i][0] == '-'); i++)  {
+    if (strcmp(av[i], "-utc") == 0) 
+      utc = 1;
+
+    else if (strncmp(av[i], "-f", 2) == 0) 
+      filename = av[++i];
+
+    else if (strncmp(av[i], "-debug", 6) == 0) {
+      debug = 1;
+    }
+
+    else if (strncmp(av[i], "-port", 9) == 0) {
+      port = atoi(av[++i]);
+    }
+#if 0
+    else
+      usage();
+#endif
+  }
+
+  if(debug) {
+    printf("DEBUG port=%d\n", port);
+  }
+
+  if(filename) {
+    file_fd = open(filename, O_CREAT|O_RDWR|O_APPEND, 0644);
+    if(file_fd < 0) {
+      fprintf(stderr, "Failed to open '%s'\n", filename);
+      exit(2);
+    }
+  }
+
+  if(background) {
+    int i;
+    if(getppid() == 1) 
+      return 0; /* Already a daemon */
+
+    i = fork();
+
+    if (i < 0) 
+      exit(1); /* error */
+
+    if (i > 0) 
+      _exit(0); /* parent exits */
+  }
+
+  setsid(); /* obtain a new process group */
+  for (i = getdtablesize(); i >= 0; --i) {
+      if(i == file_fd) continue;
+    if(debug && i == 1) continue;
+    close(i); /* close all descriptors */
+  }
+
+  i = open("/dev/null",O_RDWR); dup(i); dup(i); /* handle standard I/O */
+  umask(027); /* set newly created file permissions */
+  chdir("/"); /* change running directory */
+
+  process();
+  return 0;
 }
