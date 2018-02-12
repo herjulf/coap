@@ -13,6 +13,7 @@
 #include <errno.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
+#include <signal.h>
 
 #define BUFLEN 512
 #define PORT 5683
@@ -582,18 +583,21 @@ int main(int ac, char *av[])
 
     if (i > 0) 
       _exit(0); /* parent exits */
-  }
+  
 
-  setsid(); /* obtain a new process group */
-  for (i = getdtablesize(); i >= 0; --i) {
+    setsid(); /* obtain a new process group */
+    for (i = getdtablesize(); i >= 0; --i) {
       if(i == file_fd) continue;
-    if(debug && i == 1) continue;
-    close(i); /* close all descriptors */
-  }
+      if(debug && i == 1) continue;
+      close(i); /* close all descriptors */
+    }
 
-  i = open("/dev/null",O_RDWR); dup(i); dup(i); /* handle standard I/O */
-  umask(027); /* set newly created file permissions */
-  chdir("/"); /* change running directory */
+    i = open("/dev/null",O_RDWR); dup(i); dup(i); /* handle standard I/O */
+    umask(027); /* set newly created file permissions */
+    chdir("/"); /* change running directory */
+    
+    signal(SIGCHLD,SIG_IGN); /* ignore child */
+  }
 
   process();
   return 0;
