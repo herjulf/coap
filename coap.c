@@ -163,15 +163,16 @@ void usage(void)
 {
   printf("\nVersion %s\n", VERSION);
   printf("\ncoap: A CoAP pubsub server/endpoint\n");
-  printf("\ncoap: * stores pubsub data in file\n");
-  printf("\ncoap: * easy prococol and option debugging\n");
-  printf("\ncoap: * GPL copyright\n");
+  printf("  * Logs pubsub data in file\n");
+  printf("  * Verbose protocol and option debugging\n");
+  printf("  * Plain C, no libs, no classes etc\n");
+  printf("  * GPL copyright\n");
   printf("Usage: coap [-d] [-b] [-p port] [-gmt] [-u] [-f file]\n");
   printf(" -f file      local logfile. Default is %s\n", LOGFILE);
   printf(" -p port      TCP server port. Default %d\n", port);
   printf(" -b           run in background\n");
   printf(" -d           debug\n");
-  printf(" -ut          add Unix Time\n");
+  printf(" -ut          add Unix time\n");
   printf(" -gmt         time in GMT\n");
   exit(-1);
 }
