@@ -511,14 +511,15 @@ int process(void)
 	if(file_fd)
 	  write(file_fd, p, strlen(p));
 	if(!background) 
-	  printf("%s ", p);
+	  printf("%s", p);
 	memset((char *) &p, 0, sizeof(p));
 
 	parse_subscribe(co, recv_len, p);
+	p[strlen(p)] = '\n';
 	if(file_fd)
 	  write(file_fd, p, strlen(p));
 	if(!background) 
-	  printf("%s ", p);
+	  printf("%s", p);
 
 	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
       }	
