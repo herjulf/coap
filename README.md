@@ -86,7 +86,15 @@ Build
 make 
 
 
+Future work
+-----------
+Program is not a full implemenation of the specs rather it's implemented on per need basis. 
+
+
 References
 ----------
 RTC 7252  The Constrained Application Protocol (CoAP)  
-draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol   
+draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol
+Publish-Subscribe Communication for CoAP. Contki-OS implementation. Jussi Haikara, KTH.
+
+x
