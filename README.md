@@ -1,5 +1,5 @@
-coap: A server/endpoint for CoAP pub/sub protocol
-=================================================
+coap: A server for the CoAP pub/sub protocol
+============================================
 
 Author
 -------
@@ -24,7 +24,7 @@ This work is limited just to be an endpoint for a publisher and not to
 do data sharing broker functions. Often one just has to send data in 
 client to server like fashion with no or very controlled other users. 
 
-Implementation.
+Implementation
 --------------
 All in standard C. No need for libraries nor classes. Should be easy 
 to port and extend. Can fork be a daemon.
@@ -53,7 +53,7 @@ tail coap.dat
 </pre>
 
 Date/time and topic and payload is seen. The fcc23d0000003c14
-in this case is the unique EUI64 address of the sensor.
+in this case is the unique EUI64 address of the sensor
 
 Command line options
 --------------------
@@ -85,3 +85,5 @@ make
 
 References
 ----------
+RTC 7272  The Constrained Application Protocol (CoAP)
+draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol   
