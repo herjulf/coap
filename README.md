@@ -1,5 +1,5 @@
-coap: A CoAP publisher server/endpoint
-=======================================
+coap: A server/endpoint for CoAP pub/sub protocol
+=================================================
 
 Author
 -------
@@ -44,17 +44,20 @@ Data storage
 Received data can be stored in data file for further procssed, analysis 
 plotting etc. Datafile example:
 
+<pre>
 tail coap.dat 
      2018-02-14 14:23:36 ps/fcc23d0000003c14/temp 21.62
      2018-02-14 14:23:41 ps/fcc23d0000003c14/temp 21.62
      2018-02-14 14:23:46 ps/fcc23d0000003c14/temp 21.62
      2018-02-14 14:23:52 ps/fcc23d0000003c14(temp 21.62
+</pre>
 
 Date/time and topic and payload is seen. The fcc23d0000003c14
 in this case is the unique EUI64 address of the sensor.
 
 Command line options
 --------------------
+<pre>
 ./coap -h 
 
 Version 1.0 2018-02-11
@@ -72,8 +75,13 @@ Usage: coap [-d] [-b] [-p port] [-gmt] [-u] [-f file]
  -d           debug
  -ut          add Unix time
  -gmt         time in GMT
+</pre>
 
 
 Build
 -----
 make 
+
+
+References
+----------
