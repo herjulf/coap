@@ -21,7 +21,7 @@ sharing via the broker to multiple users called subscribers. Different
 topics can be selected.
 
 Server vs broker
-================
+----------------
 
 This work is limited just to be an endpoint for a publisher and not to 
 do data sharing broker functions. Often one just has to send data in 
@@ -88,5 +88,5 @@ make
 
 References
 ----------
-RTC 7272  The Constrained Application Protocol (CoAP)  
+RTC 7252  The Constrained Application Protocol (CoAP)  
 draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol   
