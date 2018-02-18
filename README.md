@@ -96,6 +96,6 @@ Program is not a full implemenation of the specs rather it's implemented on per 
 References
 ----------
 [1] RTC 7252  The Constrained Application Protocol (CoAP)  
-[2] draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol
-[3] Publish-Subscribe Communication for CoAP. Contki-OS implementation. Jussi Haikara, KTH.
+[2] draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol  
+[3] Publish-Subscribe Communication for CoAP. Contki-OS implementation. Jussi Haikara, KTH.  
 [4] https://github.com/posjodin/contiki Contiki-OS with pub/sub  
