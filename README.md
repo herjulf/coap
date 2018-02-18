@@ -96,5 +96,4 @@ References
 RTC 7252  The Constrained Application Protocol (CoAP)  
 draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol
 Publish-Subscribe Communication for CoAP. Contki-OS implementation. Jussi Haikara, KTH.
-
-x
+https://github.com/posjodin/contiki Contiki-OS with pub/sub  
