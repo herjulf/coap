@@ -7,13 +7,13 @@ Robert Olsson <roolss@kth.se> and <robert@radio-sensors.com>
 
 Introduction
 ------------
-CoAP is an interesting protocol for IoT devices. The drawback has
+CoAP [1] is an interesting protocol for IoT devices. The drawback has
 been the RESTful approach to handle 6LoWPAN networks as still 
 majority of hosts are ipv4-connected making it hard to access
 nodes behind a NAT. Also as sensor nodes are constrained in may
 ways there are reasons to to hide from exposure. Security 
 issues is another strong motivation for the pub/sub approach.
-The novel pub/sub draft addresses this by complementing the RESTful
+The novel pub/sub draft [2] addresses this by complementing the RESTful
 approach by adding a new broker function. The broker is outside the 
 6LowPAN. The client is inside 6LoPAN network initiates the connection 
 to post or publish data to the broker. The pub/sub draft enables further 
@@ -30,7 +30,9 @@ client to server like fashion with no or very controlled other users.
 Implementation
 --------------
 All in standard C. No need for libraries nor classes. Should be easy 
-to port and extend. Can fork be a daemon.
+to port and extend. Can fork be a daemon. This code is tested with 
+the pub/sub implementation the Contiki-OS [3] the repository from [4] 
+was used. 
  
 Copyright
 ---------
@@ -93,7 +95,7 @@ Program is not a full implemenation of the specs rather it's implemented on per 
 
 References
 ----------
-RTC 7252  The Constrained Application Protocol (CoAP)  
-draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol
-Publish-Subscribe Communication for CoAP. Contki-OS implementation. Jussi Haikara, KTH.
-https://github.com/posjodin/contiki Contiki-OS with pub/sub  
+[1] RTC 7252  The Constrained Application Protocol (CoAP)  
+[2] draft-ietf-core-coap-pubsub-03 Publish-Subscribe Broker for the Constrained Application Protocol
+[3] Publish-Subscribe Communication for CoAP. Contki-OS implementation. Jussi Haikara, KTH.
+[4] https://github.com/posjodin/contiki Contiki-OS with pub/sub  
