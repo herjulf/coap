@@ -466,13 +466,14 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 int process(void)
 {
     struct sockaddr_in si_me, si_other;
-    int s , recv_len, send_len, init;
+    int s , recv_len, send_len, init = 0;
     socklen_t slen = sizeof(si_other);
 
     char buf[BUFLEN], p[BUFLEN];
     struct coap_hdr *co;
     //char *discover = "</ps/>;rt=core.ps";
     char *discover = "</ps/>";
+
     if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)  {
         terminate("socket");
     }
@@ -482,11 +483,11 @@ int process(void)
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(port);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    
+     
     if( bind(s , (struct sockaddr*)&si_me, sizeof(si_me) ) == -1) {
         terminate("bind");
     }
-    
+     
     while(1)
     {
       memset((char *) &buf, 0, sizeof(buf));
