@@ -28,7 +28,7 @@ int file_fd;
 #define D_COAP_REPORT   (1<<1)
 #define D_COAP_STRING   (1<<2)
 
-#define BROKER_BASE_URI "</ps/>;rt=\"core.ps\";ct=40"
+#define BROKER_BASE_URI "</ps/>;rt=core.ps;ct=40"
 char *broker_base_uri = BROKER_BASE_URI;
 
 #define MAX_URI_LEN 50
