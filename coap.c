@@ -146,6 +146,10 @@ struct coap_hdr {
   unsigned short id;
 };
 
+/* Token handling */
+#define MAX_TOKEN_LEN 8
+ unsigned char tok[MAX_TOKEN_LEN];
+
 /* Option handling */
 struct coap_opt_s {
   unsigned int len:4;
@@ -222,11 +226,17 @@ void dump_pkt(struct coap_hdr *ch, int len)
     if(! ((i+1)%16) )
       printf("\n[%3d]", i);
   }
-    printf("\n");
+  printf("\n");
+
+  printf("COAP DUMP Token. Len=%d\n", ch->tkl); 
+  for(i = 4; i < ch->tkl; i++) {
+    printf(" %02x\n", d[i]);
+  }
+  printf("\n");
 
   printf("COAP DUMP Option/Payload\n"); 
 
-  for(i = 4; i < len; i++) {
+  for(i = 4 + (ch->tkl); i < len; i++) {
     unsigned olen;
 
     /* Option delta handling */
@@ -377,7 +387,7 @@ void terminate(char *s)
 }
  
 int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
-	      char *uri_query, int content, char *payload)
+	      char *uri_query, int content, char *payload, unsigned char tkl, unsigned char *tok)
 {
   int len = 0;
 
@@ -390,8 +400,17 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   ch_tx->ver = 1;
   ch_tx->type = type;
-  ch_tx->tkl = 0;
+  ch_tx->tkl = tkl;
   ch_tx->code = code;
+
+  if(tkl > MAX_TOKEN_LEN) {
+    terminate("CoAP token length err");
+  }
+
+  if(tkl) {
+    memcpy(&buf[4], tok, tkl);
+	len += tkl;
+  }
 
   if( uri ) {
     if(strlen(uri) <= 12) {
@@ -492,21 +511,24 @@ int process(void)
 	terminate("CoAP version err");
       }
 
-      if(co->tkl > 8) {
+      if(co->tkl > MAX_TOKEN_LEN) {
 	terminate("CoAP token length err");
       }
+
+      if(co->tkl)
+	memcpy(tok, &buf[4], co->tkl);
 
       /* Simple CoAP pubsub state machinery */
 
       /* DISCOVER */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
 	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, APPLICATION_LINK_FORMAT,
-			     broker_base_uri);
+			     broker_base_uri, co->tkl, tok);
       }	
 
       /* CREATE */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_POST)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok);
 	init = 1;
       }	
 
@@ -516,7 +538,7 @@ int process(void)
 	memset((char *) &p, 0, sizeof(p));
 
 	if(init == 0) {
-	  send_len = do_packet(buf, COAP_TYPE_RST, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
+	  send_len = do_packet(buf, COAP_TYPE_RST, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok);
 	  continue;
 	}
 
@@ -534,7 +556,7 @@ int process(void)
 	if(!background) 
 	  printf("%s", p);
 
-	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok);
       }	
 
       if(send_len) {
