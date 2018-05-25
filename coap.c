@@ -296,6 +296,12 @@ void dump_pkt(struct coap_hdr *ch, int len)
 	for(ii = 1; ii <= olen; ii++) 
 	  printf("%c", d[ii+i]);
       }
+      else if(opt == COAP_OPTION_OBSERVE) {
+	unsigned ii;
+	printf("observe=");
+	for(ii = 1; ii <= olen; ii++) 
+	  printf(" 0x%02x", d[ii+i]);
+      }
       else if(opt == COAP_OPTION_CONTENT_FORMAT) {
 	printf("cf=%d", d[i+1]);
       }
@@ -397,6 +403,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   
   ch_tx = (struct coap_hdr*) &buf[0];
   len = sizeof(struct coap_hdr);
+  int delta=0;
 
   ch_tx->ver = 1;
   ch_tx->type = type;
@@ -412,10 +419,22 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 	len += tkl;
   }
 
+  if( 0 ) {
+    ch_os = (struct coap_opt_s*) &buf[len];
+    ch_os->delta = 6; /* COAP_OPTION_OBSERVE = 6 */
+    delta = ch_os->delta;
+    ch_os->len = 1; /* We use now */
+    len++;
+    buf[len] = 0;
+    if(debug & D_COAP_PKT)
+      printf("SHORT delta=%d, len=%d\n", ch_os->delta, ch_os->len); 
+  }
+  
   if( uri ) {
     if(strlen(uri) <= 12) {
       ch_os = (struct coap_opt_s*) &buf[len];
-      ch_os->delta = 11; /* COAP_OPTION_URI_PATH = 11 */
+      ch_os->delta = COAP_OPTION_URI_PATH - delta;
+      delta = ch_os->delta;
       ch_os->len = strlen(uri);
       len++;
       strcpy(&buf[len], uri); /* Short opt */
@@ -425,7 +444,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     }
     else if(strlen(uri) > 12) {
       ch_ol = (struct coap_opt_l*) &buf[len];
-      ch_ol->delta = 11;  /* Uri-Patch */
+      ch_ol->delta = COAP_OPTION_URI_PATH - delta;
+      delta = ch_ol->delta;
       ch_ol->flag = 13;   /* 1 byte extension */
       ch_ol->len = strlen(uri) - 13;
       len += 2;
@@ -438,7 +458,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   if( content != CONTENT_NOT_DEFINED) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = 1; /* COAP_OPTION_CONTENT_FORMAT = 12 */
+    ch_os->delta = COAP_OPTION_CONTENT_FORMAT - delta; /* COAP_OPTION_CONTENT_FORMAT = 12 */
+    delta = ch_os->delta;
     ch_os->len = 1;
     len++;
     buf[len] = content;
@@ -447,7 +468,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   if(uri_query) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = 3; /* COAP_OPTION_URI_QUERY = 15 */
+    ch_os->delta = COAP_OPTION_URI_QUERY - delta; /* COAP_OPTION_URI_QUERY = 15 */
+    delta = ch_os->delta;
     ch_os->len = strlen(uri_query);
     len++;
     strcpy(&buf[len], uri_query); /* Short opt */
@@ -488,6 +510,26 @@ int process(void)
         terminate("bind");
     }
      
+
+    /* Send subscribe */ 
+
+    char *uri = "/ps/temp";
+    //send_len = do_packet(buf, COAP_TYPE_CON, NULL, &uri, NULL, TEXT_PLAIN, NULL, 2, tok);
+
+    
+#if 0
+    if(send_len) {
+      if(debug & D_COAP_PKT)
+	dump_pkt(co, send_len);
+      
+      if (sendto(s, buf, send_len, 0, (struct sockaddr*) &si_other, 
+		 slen) == -1)  {
+	terminate("sendto()");
+      }
+    }
+#endif
+
+
     while(1)
     {
       memset((char *) &buf, 0, sizeof(buf));
