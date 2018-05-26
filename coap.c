@@ -15,8 +15,10 @@
 #include<sys/socket.h>
 #include <signal.h>
 
-#define VERSION "1.0 2018-02-11"
+#define VERSION "1.1 2018-05-27"
 #define BUFLEN 512
+
+#define SUBSCRIBER_ADDR "192.16.125.232"
 
 #define PORT 5683
 short port = PORT;
@@ -128,7 +130,7 @@ typedef enum {
 } coap_content_t;
 
 
-unsigned int debug = 0;
+unsigned int debug = 0, subscribe = 0;
 int date = 1, utime =0, gmt=0, background = 0;
 
 struct udp_hdr {
@@ -175,6 +177,7 @@ void usage(void)
   printf(" -f file      local logfile. Default is %s\n", LOGFILE);
   printf(" -p port      TCP server port. Default %d\n", port);
   printf(" -b           run in background\n");
+  printf(" -s           subscribe\n");
   printf(" -d           debug\n");
   printf(" -ut          add Unix time\n");
   printf(" -gmt         time in GMT\n");
@@ -393,7 +396,8 @@ void terminate(char *s)
 }
  
 int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
-	      char *uri_query, int content, char *payload, unsigned char tkl, unsigned char *tok)
+	      char *uri_query, int content, char *payload, unsigned char tkl, unsigned char *tok, 
+	      unsigned char obsl, unsigned obsv)
 {
   int len = 0;
 
@@ -403,7 +407,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   
   ch_tx = (struct coap_hdr*) &buf[0];
   len = sizeof(struct coap_hdr);
-  int delta=0;
+  int last_option=0;
 
   ch_tx->ver = 1;
   ch_tx->type = type;
@@ -419,13 +423,14 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 	len += tkl;
   }
 
-  if( 0 ) {
+  if( obsl ) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = 6; /* COAP_OPTION_OBSERVE = 6 */
-    delta = ch_os->delta;
-    ch_os->len = 1; /* We use now */
+    ch_os->delta = COAP_OPTION_OBSERVE - last_option; /* COAP_OPTION_OBSERVE */
+    last_option = COAP_OPTION_OBSERVE;
+    ch_os->len = obsl; 
     len++;
-    buf[len] = 0;
+    buf[len] = obsv;
+    len += obsl;
     if(debug & D_COAP_PKT)
       printf("SHORT delta=%d, len=%d\n", ch_os->delta, ch_os->len); 
   }
@@ -433,8 +438,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   if( uri ) {
     if(strlen(uri) <= 12) {
       ch_os = (struct coap_opt_s*) &buf[len];
-      ch_os->delta = COAP_OPTION_URI_PATH - delta;
-      delta = ch_os->delta;
+      ch_os->delta = COAP_OPTION_URI_PATH - last_option; /* COAP_OPTION_URI_PATH = 11 */
+      last_option = COAP_OPTION_URI_PATH;
       ch_os->len = strlen(uri);
       len++;
       strcpy(&buf[len], uri); /* Short opt */
@@ -444,8 +449,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     }
     else if(strlen(uri) > 12) {
       ch_ol = (struct coap_opt_l*) &buf[len];
-      ch_ol->delta = COAP_OPTION_URI_PATH - delta;
-      delta = ch_ol->delta;
+      ch_ol->delta = COAP_OPTION_URI_PATH - last_option; /* COAP_OPTION_URI_PATH = 11 */
+      last_option = COAP_OPTION_URI_PATH;
       ch_ol->flag = 13;   /* 1 byte extension */
       ch_ol->len = strlen(uri) - 13;
       len += 2;
@@ -456,10 +461,10 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     }
   }
 
-  if( content != CONTENT_NOT_DEFINED) {
+  if(content != CONTENT_NOT_DEFINED) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = COAP_OPTION_CONTENT_FORMAT - delta; /* COAP_OPTION_CONTENT_FORMAT = 12 */
-    delta = ch_os->delta;
+    ch_os->delta = COAP_OPTION_CONTENT_FORMAT - last_option; /* COAP_OPTION_CONTENT_FORMAT = 12 */
+    last_option = COAP_OPTION_CONTENT_FORMAT;
     ch_os->len = 1;
     len++;
     buf[len] = content;
@@ -468,8 +473,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   if(uri_query) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = COAP_OPTION_URI_QUERY - delta; /* COAP_OPTION_URI_QUERY = 15 */
-    delta = ch_os->delta;
+    ch_os->delta = COAP_OPTION_URI_QUERY  - last_option; /* COAP_OPTION_URI_QUERY = 15 */ 
+    last_option = COAP_OPTION_URI_QUERY;
     ch_os->len = strlen(uri_query);
     len++;
     strcpy(&buf[len], uri_query); /* Short opt */
@@ -501,34 +506,29 @@ int process(void)
     }
      
     memset((char *) &si_me, 0, sizeof(si_me));
-     
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(port);
-    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-     
-    if( bind(s , (struct sockaddr*)&si_me, sizeof(si_me) ) == -1) {
-        terminate("bind");
-    }
-     
 
-    /* Send subscribe */ 
+    if(subscribe) {
+      si_other.sin_family = AF_INET;
+      si_other.sin_port = htons(port);
+      if (inet_aton(SUBSCRIBER_ADDR , &si_other.sin_addr) == 0) {
+	  terminate("inet_aton");
+      }
 
-    char *uri = "/ps/temp";
-    //send_len = do_packet(buf, COAP_TYPE_CON, NULL, &uri, NULL, TEXT_PLAIN, NULL, 2, tok);
+      char *uri = "/ps/temp";
+      send_len = do_packet(buf, COAP_TYPE_CON, 0, uri, NULL, TEXT_PLAIN, NULL, 2, tok, 1,0);
 
-    
-#if 0
-    if(send_len) {
-      if(debug & D_COAP_PKT)
-	dump_pkt(co, send_len);
-      
-      if (sendto(s, buf, send_len, 0, (struct sockaddr*) &si_other, 
-		 slen) == -1)  {
-	terminate("sendto()");
+      if(send_len) {
+	if(debug & D_COAP_PKT)
+	  dump_pkt((struct coap_hdr*)buf, send_len);
+	
+	if (sendto(s, buf, send_len, 0, (struct sockaddr*) &si_other, 
+		   slen) == -1)  {
+	  terminate("sendto()");
+	}
       }
     }
-#endif
-
 
     while(1)
     {
@@ -566,12 +566,12 @@ int process(void)
       /* DISCOVER */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
 	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, APPLICATION_LINK_FORMAT,
-			     broker_base_uri, co->tkl, tok);
+			     broker_base_uri, co->tkl, tok,0,0);
       }	
 
       /* CREATE */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_POST)) {
-	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
 	init = 1;
       }	
 
@@ -581,7 +581,7 @@ int process(void)
 	memset((char *) &p, 0, sizeof(p));
 
 	if(init == 0) {
-	  send_len = do_packet(buf, COAP_TYPE_RST, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok);
+	  send_len = do_packet(buf, COAP_TYPE_RST, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
 	  continue;
 	}
 
@@ -599,7 +599,7 @@ int process(void)
 	if(!background) 
 	  printf("%s", p);
 
-	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok);
+	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
       }	
 
       if(send_len) {
@@ -635,6 +635,8 @@ int main(int ac, char *av[])
       debug = 3;
     else if (strncmp(av[i], "-p", 2) == 0)
       port = atoi(av[++i]);
+    else if (strncmp(av[i], "-s", 2) == 0)
+      subscribe = 1;
     else if (strncmp(av[i], "-b", 2) == 0) 
       background = 1;
   }
