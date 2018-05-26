@@ -407,7 +407,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   
   ch_tx = (struct coap_hdr*) &buf[0];
   len = sizeof(struct coap_hdr);
-  int delta=0;
+  int last_option=0;
 
   ch_tx->ver = 1;
   ch_tx->type = type;
@@ -425,8 +425,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   if( obsl ) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = 6; /* COAP_OPTION_OBSERVE = 6 */
-    delta = ch_os->delta;
+    ch_os->delta = COAP_OPTION_OBSERVE - last_option; /* COAP_OPTION_OBSERVE */
+    last_option = COAP_OPTION_OBSERVE;
     ch_os->len = obsl; 
     len++;
     buf[len] = obsv;
@@ -438,8 +438,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   if( uri ) {
     if(strlen(uri) <= 12) {
       ch_os = (struct coap_opt_s*) &buf[len];
-      ch_os->delta = COAP_OPTION_URI_PATH - delta;
-      delta = ch_os->delta;
+      ch_os->delta = COAP_OPTION_URI_PATH - last_option; /* COAP_OPTION_URI_PATH = 11 */
+      last_option = COAP_OPTION_URI_PATH;
       ch_os->len = strlen(uri);
       len++;
       strcpy(&buf[len], uri); /* Short opt */
@@ -449,8 +449,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     }
     else if(strlen(uri) > 12) {
       ch_ol = (struct coap_opt_l*) &buf[len];
-      ch_ol->delta = COAP_OPTION_URI_PATH - delta;
-      delta = ch_ol->delta;
+      ch_ol->delta = COAP_OPTION_URI_PATH - last_option; /* COAP_OPTION_URI_PATH = 11 */
+      last_option = COAP_OPTION_URI_PATH;
       ch_ol->flag = 13;   /* 1 byte extension */
       ch_ol->len = strlen(uri) - 13;
       len += 2;
@@ -463,8 +463,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   if(content != CONTENT_NOT_DEFINED) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = COAP_OPTION_CONTENT_FORMAT - delta; /* COAP_OPTION_CONTENT_FORMAT = 12 */
-    delta = ch_os->delta;
+    ch_os->delta = COAP_OPTION_CONTENT_FORMAT - last_option; /* COAP_OPTION_CONTENT_FORMAT = 12 */
+    last_option = COAP_OPTION_CONTENT_FORMAT;
     ch_os->len = 1;
     len++;
     buf[len] = content;
@@ -473,8 +473,8 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
 
   if(uri_query) {
     ch_os = (struct coap_opt_s*) &buf[len];
-    ch_os->delta = COAP_OPTION_URI_QUERY - delta; /* COAP_OPTION_URI_QUERY = 15 */
-    delta = ch_os->delta;
+    ch_os->delta = COAP_OPTION_URI_QUERY  - last_option; /* COAP_OPTION_URI_QUERY = 15 */ 
+    last_option = COAP_OPTION_URI_QUERY;
     ch_os->len = strlen(uri_query);
     len++;
     strcpy(&buf[len], uri_query); /* Short opt */
