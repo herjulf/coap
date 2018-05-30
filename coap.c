@@ -15,10 +15,8 @@
 #include<sys/socket.h>
 #include <signal.h>
 
-#define VERSION "1.2 2018-05-30"
+#define VERSION "1.3 2018-05-30"
 #define BUFLEN 512
-
-#define SUBSCRIBER_ADDR "192.16.125.232"
 
 #define PORT 5683
 short port = PORT;
@@ -32,11 +30,12 @@ int file_fd;
 
 #define BROKER_BASE_URI "<ps/>;rt=core.ps;ct=40"
 char *broker_base_uri = BROKER_BASE_URI;
+char *subscribe_host  = NULL;
 
 #define MAX_URI_LEN 50
 char uri[MAX_URI_LEN];
 
-char *subscribe_uri;
+char *subscribe_uri   = NULL;
 
 /* CoAP types */
 typedef enum {
@@ -170,16 +169,17 @@ void usage(void)
 {
   printf("\nVersion %s\n", VERSION);
   printf("\ncoap: A CoAP pubsub server/endpoint\n");
-  printf("  * Also a simple CoAP pubsub subscriber\n");
+  printf("  * A simple CoAP pubsub subscriber\n");
   printf("  * Logs pubsub data in file\n");
   printf("  * Verbose protocol and option debugging\n");
   printf("  * Plain C, no libs, no classes etc\n");
   printf("  * GPL copyright\n");
-  printf("Usage: coap [-d] [-b] [-p port] [-gmt] [-u uri] [-f file]\n");
+  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-s broker] [-u uri] [-f file]\n");
   printf(" -f file      local logfile. Default is %s\n", LOGFILE);
   printf(" -p port      TCP server port. Default %d\n", port);
   printf(" -b           run in background\n");
   printf(" -u           subscribe uri\n");
+  printf(" -s           subscribe host/broker\n");
   printf(" -d           debug\n");
   printf(" -ut          add Unix time\n");
   printf(" -gmt         time in GMT\n");
@@ -219,9 +219,9 @@ void dump_pkt(struct coap_hdr *ch, int len)
   char *d = (char *) ch; 
   unsigned ii, opt = 0, old_opt = 0;
 
-  printf("COAP DUMP pkt lengh=%d\n", len); 
+  printf("COAP DUMP HEAD lengh=%d\n", len); 
   printf("v=%u t=%u tkl=%u code=%u id=%x\n", ch->ver, ch->type, ch->tkl, ch->code, ch->id);
-
+  printf("COAP DUMP HEX\n"); 
   for(i = 0; i < len; i++) {
     if(!i) 
       printf("[%3d]", i);
@@ -436,8 +436,6 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     len++;
     buf[len] = obsv;
     len += obsl;
-    if(debug & D_COAP_PKT)
-      printf("SHORT delta=%d, len=%d\n", ch_os->delta, ch_os->len); 
   }
   
   if( uri ) {
@@ -449,8 +447,6 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
       len++;
       strcpy(&buf[len], uri); /* Short opt */
       len += strlen(uri);
-      if(debug & D_COAP_PKT)
-	printf("SHORT delta=%d, len=%d\n", ch_os->delta, ch_os->len); 
     }
     else if(strlen(uri) > 12) {
       ch_ol = (struct coap_opt_l*) &buf[len];
@@ -522,7 +518,7 @@ int process(void)
     if(subscribe_uri) {
       si_other.sin_family = AF_INET;
       si_other.sin_port = htons(port);
-      if (inet_aton(SUBSCRIBER_ADDR , &si_other.sin_addr) == 0) {
+      if (inet_aton(subscribe_host , &si_other.sin_addr) == 0) {
 	  terminate("inet_aton");
       }
 
@@ -648,6 +644,8 @@ int main(int ac, char *av[])
       debug = 3;
     else if (strncmp(av[i], "-p", 2) == 0)
       port = atoi(av[++i]);
+    else if (strncmp(av[i], "-s", 2) == 0)
+      subscribe_host = av[++i];
     else if (strncmp(av[i], "-u", 2) == 0)
       subscribe_uri = av[++i];
     else if (strncmp(av[i], "-b", 2) == 0) 
@@ -665,6 +663,7 @@ int main(int ac, char *av[])
     printf("DEBUG background=%d\n", background);
     printf("DEBUG file=%s\n", filename);
     printf("DEBUG subscribe_uri=%s\n", subscribe_uri);
+    printf("DEBUG subscribe_host=%s\n", subscribe_host);
   }
 
   if(filename) {

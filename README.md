@@ -63,21 +63,23 @@ in this case is the unique EUI64 address of the sensor
 Command line options
 --------------------
 <pre>
-./coap -h 
+coap -h
 
-Version 1.2 2018-05-30
+Version 1.3 2018-05-30
 
 coap: A CoAP pubsub server/endpoint
-  * Also a simple CoAP pubsub subscriber
+  * A simple CoAP pubsub subscriber
   * Logs pubsub data in file
   * Verbose protocol and option debugging
   * Plain C, no libs, no classes etc
   * GPL copyright
-Usage: coap [-d] [-b] [-p port] [-gmt] [-u uri] [-f file]
+
+coap [-d] [-b] [-p port] [-gmt] [-s broker] [-u uri] [-f file]
  -f file      local logfile. Default is ./coap.dat
  -p port      TCP server port. Default 5683
  -b           run in background
  -u           subscribe uri
+ -s           subscribe host/broker
  -d           debug
  -ut          add Unix time
  -gmt         time in GMT
