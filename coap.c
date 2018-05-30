@@ -15,7 +15,7 @@
 #include<sys/socket.h>
 #include <signal.h>
 
-#define VERSION "1.1 2018-05-27"
+#define VERSION "1.2 2018-05-30"
 #define BUFLEN 512
 
 #define SUBSCRIBER_ADDR "192.16.125.232"
@@ -35,6 +35,8 @@ char *broker_base_uri = BROKER_BASE_URI;
 
 #define MAX_URI_LEN 50
 char uri[MAX_URI_LEN];
+
+char *subscribe_uri;
 
 /* CoAP types */
 typedef enum {
@@ -129,8 +131,7 @@ typedef enum {
   APPLICATION_X_OBIX_BINARY = 51
 } coap_content_t;
 
-
-unsigned int debug = 0, subscribe = 0;
+unsigned int debug = 0;
 int date = 1, utime =0, gmt=0, background = 0;
 
 struct udp_hdr {
@@ -169,15 +170,16 @@ void usage(void)
 {
   printf("\nVersion %s\n", VERSION);
   printf("\ncoap: A CoAP pubsub server/endpoint\n");
+  printf("  * Also a simple CoAP pubsub subscriber\n");
   printf("  * Logs pubsub data in file\n");
   printf("  * Verbose protocol and option debugging\n");
   printf("  * Plain C, no libs, no classes etc\n");
   printf("  * GPL copyright\n");
-  printf("Usage: coap [-d] [-b] [-p port] [-gmt] [-u] [-f file]\n");
+  printf("Usage: coap [-d] [-b] [-p port] [-gmt] [-u uri] [-f file]\n");
   printf(" -f file      local logfile. Default is %s\n", LOGFILE);
   printf(" -p port      TCP server port. Default %d\n", port);
   printf(" -b           run in background\n");
-  printf(" -s           subscribe\n");
+  printf(" -u           subscribe uri\n");
   printf(" -d           debug\n");
   printf(" -ut          add Unix time\n");
   printf(" -gmt         time in GMT\n");
@@ -231,13 +233,13 @@ void dump_pkt(struct coap_hdr *ch, int len)
   }
   printf("\n");
 
-  printf("COAP DUMP Token. Len=%d\n", ch->tkl); 
-  for(i = 4; i < ch->tkl; i++) {
-    printf(" %02x\n", d[i]);
+  printf("COAP DUMP Token\nLen=%d", ch->tkl); 
+  for(i = 0; i < ch->tkl; i++) {
+    printf(" 0x%02x ", d[i+4] & 0xFF);
   }
   printf("\n");
 
-  printf("COAP DUMP Option/Payload\n"); 
+  printf("COAP DUMP Option\n"); 
 
   for(i = 4 + (ch->tkl); i < len; i++) {
     unsigned olen;
@@ -259,7 +261,8 @@ void dump_pkt(struct coap_hdr *ch, int len)
 	opt += 269;
       }
       else if(opt == 15) {
-	printf("PAYLOAD=%s\n", &d[i+1]);
+	printf("COAP DUMP PAYLOAD\n"); 
+	printf("%s\n", &d[i+1]);
 	return;
       }
     }
@@ -303,7 +306,7 @@ void dump_pkt(struct coap_hdr *ch, int len)
 	unsigned ii;
 	printf("observe=");
 	for(ii = 1; ii <= olen; ii++) 
-	  printf(" 0x%02x", d[ii+i]);
+	  printf("0x%02x", d[ii+i]);
       }
       else if(opt == COAP_OPTION_CONTENT_FORMAT) {
 	printf("cf=%d", d[i+1]);
@@ -514,20 +517,18 @@ int process(void)
       terminate("bind");
     }
     
-    if(subscribe) {
+    if(subscribe_uri) {
       si_other.sin_family = AF_INET;
       si_other.sin_port = htons(port);
       if (inet_aton(SUBSCRIBER_ADDR , &si_other.sin_addr) == 0) {
 	  terminate("inet_aton");
       }
 
-      char *uri = "ps/topic1";
-
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
 
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 1, uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, 1, subscribe_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
 
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -645,8 +646,8 @@ int main(int ac, char *av[])
       debug = 3;
     else if (strncmp(av[i], "-p", 2) == 0)
       port = atoi(av[++i]);
-    else if (strncmp(av[i], "-s", 2) == 0)
-      subscribe = 1;
+    else if (strncmp(av[i], "-u", 2) == 0)
+      subscribe_uri = av[++i];
     else if (strncmp(av[i], "-b", 2) == 0) 
       background = 1;
   }
@@ -661,6 +662,7 @@ int main(int ac, char *av[])
     printf("DEBUG Unix Time=%d\n", utime);
     printf("DEBUG background=%d\n", background);
     printf("DEBUG file=%s\n", filename);
+    printf("DEBUG subscribe_uri=%s\n", subscribe_uri);
   }
 
   if(filename) {

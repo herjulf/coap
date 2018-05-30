@@ -1,5 +1,5 @@
-coap: A server for the CoAP pub/sub protocol
-============================================
+coap: A server and subscriber for the CoAP pub/sub protocol
+===========================================================
 
 Author
 -------
@@ -65,18 +65,19 @@ Command line options
 <pre>
 ./coap -h 
 
-Version 1.0 2018-02-11
+Version 1.2 2018-05-30
 
 coap: A CoAP pubsub server/endpoint
+  * Also a simple CoAP pubsub subscriber
   * Logs pubsub data in file
   * Verbose protocol and option debugging
   * Plain C, no libs, no classes etc
   * GPL copyright
-
-Usage: coap [-d] [-b] [-p port] [-gmt] [-u] [-f file]
+Usage: coap [-d] [-b] [-p port] [-gmt] [-u uri] [-f file]
  -f file      local logfile. Default is ./coap.dat
  -p port      TCP server port. Default 5683
  -b           run in background
+ -u           subscribe uri
  -d           debug
  -ut          add Unix time
  -gmt         time in GMT
