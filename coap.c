@@ -217,7 +217,7 @@ void dump_pkt(struct coap_hdr *ch, int len)
 {
   int i;
   char *d = (char *) ch; 
-  unsigned opt = 0, old_opt = 0;
+  unsigned ii, opt = 0, old_opt = 0;
 
   printf("COAP DUMP pkt lengh=%d\n", len); 
   printf("v=%u t=%u tkl=%u code=%u id=%x\n", ch->ver, ch->type, ch->tkl, ch->code, ch->id);
@@ -291,19 +291,21 @@ void dump_pkt(struct coap_hdr *ch, int len)
 
     if( olen ) {
       if(opt == COAP_OPTION_URI_PATH) {
-	unsigned ii;
 	printf("uri-path=");
 	for(ii = 1; ii <= olen; ii++) 
 	  printf("%c", d[ii+i]);
       }
+      else if(opt == COAP_OPTION_CONTENT_FORMAT) {
+	printf("content-format=");
+	for(ii = 1; ii <= olen; ii++)
+	  printf("0x%02x", d[ii+i]);
+      }
       else if(opt == COAP_OPTION_URI_QUERY) {
-	unsigned ii;
 	printf("uri-query=");
 	for(ii = 1; ii <= olen; ii++) 
 	  printf("%c", d[ii+i]);
       }
       else if(opt == COAP_OPTION_OBSERVE) {
-	unsigned ii;
 	printf("observe=");
 	for(ii = 1; ii <= olen; ii++) 
 	  printf("0x%02x", d[ii+i]);
