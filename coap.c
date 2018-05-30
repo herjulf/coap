@@ -30,7 +30,7 @@ int file_fd;
 #define D_COAP_REPORT   (1<<1)
 #define D_COAP_STRING   (1<<2)
 
-#define BROKER_BASE_URI "</ps/>;rt=core.ps;ct=40"
+#define BROKER_BASE_URI "<ps/>;rt=core.ps;ct=40"
 char *broker_base_uri = BROKER_BASE_URI;
 
 #define MAX_URI_LEN 50
@@ -495,6 +495,7 @@ int process(void)
     struct sockaddr_in si_me, si_other;
     int s , recv_len, send_len, init = 0;
     socklen_t slen = sizeof(si_other);
+    unsigned char i, tkl;
 
     char buf[BUFLEN], p[BUFLEN];
     struct coap_hdr *co;
@@ -520,8 +521,13 @@ int process(void)
 	  terminate("inet_aton");
       }
 
-      char *uri = "/ps/temp";
-      send_len = do_packet(buf, COAP_TYPE_CON, 0, uri, NULL, TEXT_PLAIN, NULL, 2, tok, 1,0);
+      char *uri = "ps/topic1";
+
+      for (i = 0; i < MAX_TOKEN_LEN; i++)
+        tok[i] = rand();
+
+      tkl = 2;
+      send_len = do_packet(buf, COAP_TYPE_CON, 1, uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
 
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -644,6 +650,10 @@ int main(int ac, char *av[])
     else if (strncmp(av[i], "-b", 2) == 0) 
       background = 1;
   }
+
+  /* Setup for some radom */
+  srand((unsigned int)**main + (unsigned int)&ac + (unsigned int)time(NULL));
+  srand(rand());
 
   if(debug) {
     printf("DEBUG port=%d\n", port);
