@@ -289,7 +289,7 @@ void dump_pkt(struct coap_hdr *ch, int len)
 
     printf("Option: opt=%u, len=%u ", opt, olen);
 
-    if( olen ) {
+    if( 1 ) {
       if(opt == COAP_OPTION_URI_PATH) {
 	printf("uri-path=");
 	for(ii = 1; ii <= olen; ii++) 
