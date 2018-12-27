@@ -19,10 +19,13 @@
 #define BUFLEN 512
 
 #define PORT 5683
-short port = PORT;
+unsigned short port = PORT;
 
 int file_fd;
 #define LOGFILE "./coap.dat"
+
+#define PS_DISCOVERY "/.well-known/core?rt=core.ps"
+#define DISCOVERY "/.well-known/core"
 
 #define D_COAP_PKT      (1<<0)
 #define D_COAP_REPORT   (1<<1)
@@ -30,14 +33,16 @@ int file_fd;
 
 #define BROKER_BASE_URI "<ps/>;rt=core.ps;ct=40"
 char *broker_base_uri = BROKER_BASE_URI;
-char *subscribe_host  = NULL;
+char *host  = NULL;
 
 #define MAX_URI_LEN 50
 char uri[MAX_URI_LEN];
 
-char *subscribe_uri   = NULL;
-char *publish_uri   = NULL;
+char *server   = NULL;
+char *sub_uri   = NULL;
+char *pub_uri   = NULL;
 char *payload   = NULL;
+char *dis_uri   = NULL;
 
 /* CoAP types */
 typedef enum {
@@ -176,16 +181,23 @@ void usage(void)
   printf("  * Verbose protocol and option debugging\n");
   printf("  * Implementation in plain C, no libs, no classes etc\n");
   printf("  * GPL copyright\n");
-  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-s broker] [-u uri] [-f file]\n");
-  printf(" -f file      local logfile. Default is %s\n", LOGFILE);
-  printf(" -p port      TCP server port. Default %d\n", port);
-  printf(" -b           run in background\n");
-  printf(" -u           uri\n");
-  printf(" -s           subscribe host/broker\n");
-  printf(" -pub         host uri\n");
-  printf(" -d           debug\n");
-  printf(" -ut          add Unix time\n");
-  printf(" -gmt         time in GMT\n");
+  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-sub broker uri [-dis broker uri] ] [-u uri] [-f file]\n");
+  printf(" -f file        -- local logfile. Default is %s\n", LOGFILE);
+  printf(" -p port        -- TCP server port. Default %d\n", port);
+  printf(" -b             -- run in background\n");
+  printf(" -u             --  uri\n");
+  printf(" -dis host uri  -- discover\n");
+  printf(" -sub host uri  -- subscribe\n");
+  printf(" -pub host uri  -- publish\n");
+  printf(" -server\n");
+  printf(" -d             -- debug\n");
+  printf(" -ut            -- add Unix time\n");
+  printf(" -gmt           -- time in GMT\n");
+
+  printf("\nExample 1 -- discover coap:\n coap -dis  192.16.125.232 .well-known/core?rt=core.ps\n");
+  printf("\nExample 2 -- discover coap pubsub:\n coap  -dis 192.16.125.232 .well-known/core\n");
+  printf("\nExample 3 -- subscribe topic:\n coap  -sub 192.16.125.232 .well-known/core?\n");
+
   exit(-1);
 }
 
@@ -336,7 +348,6 @@ void parse_subscribe(struct coap_hdr *ch, int len, char *p)
   char *d = (char *) ch; 
   unsigned opt = 0, old_opt = 0;
 
-
   for(i = 4 + (ch->tkl); i < len; i++) {
     unsigned olen;
 
@@ -479,7 +490,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     len++;
   }  
 
-  if(publish_uri) {
+  if(pub_uri) {
     ch_os = (struct coap_opt_s*) &buf[len];
     ch_os->delta = COAP_OPTION_MAX_AGE - last_option; /* COAP_OPTION_MAX_AGE = 14 */
     last_option = COAP_OPTION_MAX_AGE;
@@ -523,7 +534,7 @@ int process(void)
         terminate("socket");
     }
 
-    if(0 && !publish_uri) {
+    if(server) {
       memset((char *) &si_me, 0, sizeof(si_me));
       si_me.sin_family = AF_INET;
       si_me.sin_port = htons(port);
@@ -532,20 +543,43 @@ int process(void)
 	terminate("bind");
       }
     }
-      
-    if(publish_uri) {
+    else if(dis_uri) {
       si_other.sin_family = AF_INET;
       si_other.sin_port = htons(port);
-      if (inet_aton(subscribe_host , &si_other.sin_addr) == 0) {
+      if (inet_aton(host , &si_other.sin_addr) == 0) {
 	  terminate("inet_aton");
       }
 
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
-
       tkl = 2;
-      //send_len = do_packet(buf, COAP_TYPE_CON, 3, publish_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
-      send_len = do_packet(buf, COAP_TYPE_CON, 3, publish_uri, NULL, CONTENT_NOT_DEFINED, payload, tkl, tok, 0,0);
+      //send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, 1, dis_uri, NULL, CONTENT_NOT_DEFINED, NULL, tkl, tok, 0,0);
+      if(send_len) {
+	if(debug & D_COAP_PKT)
+	  dump_pkt((struct coap_hdr*)buf, send_len, "dis");
+	
+	if (sendto(s, buf, send_len, 0, (struct sockaddr*) &si_other, 
+		   slen) == -1)  {
+	  terminate("sendto()");
+	}
+	if(debug & D_COAP_PKT)
+	  printf("Sent %d bytes to %s:%d\n", send_len, inet_ntoa(si_other.sin_addr), 
+		 ntohs(si_other.sin_port));
+      }
+    }
+    else if(pub_uri) {
+      si_other.sin_family = AF_INET;
+      si_other.sin_port = htons(port);
+      if (inet_aton(host , &si_other.sin_addr) == 0) {
+	  terminate("inet_aton");
+      }
+
+      for (i = 0; i < MAX_TOKEN_LEN; i++)
+        tok[i] = rand();
+      tkl = 2;
+      //send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, CONTENT_NOT_DEFINED, payload, tkl, tok, 0,0);
       if(send_len) {
 	if(debug & D_COAP_PKT)
 	  dump_pkt((struct coap_hdr*)buf, send_len, "pub");
@@ -557,22 +591,19 @@ int process(void)
 	if(debug & D_COAP_PKT)
 	  printf("Sent %d bytes to %s:%d\n", send_len, inet_ntoa(si_other.sin_addr), 
 		 ntohs(si_other.sin_port));
-
       }
     }
-
-    if(subscribe_uri) {
+    else if(sub_uri) {
       si_other.sin_family = AF_INET;
       si_other.sin_port = htons(port);
-      if (inet_aton(subscribe_host , &si_other.sin_addr) == 0) {
+      if (inet_aton(host , &si_other.sin_addr) == 0) {
 	terminate("inet_aton");
       }
       
       for (i = 0; i < MAX_TOKEN_LEN; i++)
 	tok[i] = rand();
-      
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 1, subscribe_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, 1, sub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
       
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -617,23 +648,23 @@ int process(void)
 
       /* Simple CoAP pubsub state machinery */
 
-      /* DISCOVER */
+      /* DISCOVER reply*/
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_GET)) {
 	send_len = do_packet(buf, COAP_TYPE_ACK, CONTENT_2_05, discover, NULL, APPLICATION_LINK_FORMAT,
 			     broker_base_uri, co->tkl, tok,0,0);
       }	
 
-      if(subscribe_uri)
+      if(sub_uri)
 	init = 1;
       
-      /* CREATE */
+      /* CREATE reply */
       if((co->type == COAP_TYPE_CON) && (co->code == COAP_POST)) {
 	send_len = do_packet(buf, COAP_TYPE_ACK, CREATED_2_01, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
 	init = 1;
       }	
 
-      /* SUBSCRIBE -- PUT OR POST */
-      if(subscribe_uri || ((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT))) {
+      /* SUBSCRIBE -- PUT OR POST reply */
+      if(sub_uri || ((co->type == COAP_TYPE_CON) && (co->code == COAP_PUT))) {
 
 	memset((char *) &p, 0, sizeof(p));
 
@@ -641,7 +672,6 @@ int process(void)
 	  send_len = do_packet(buf, COAP_TYPE_RST, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
 	  continue;
 	}
-
 
 	print_date(p); 
 	if(file_fd)
@@ -652,16 +682,16 @@ int process(void)
 
 	parse_subscribe(co, recv_len, p);
 	p[strlen(p)] = '\n';
-
+	
 	if(file_fd)
 	  write(file_fd, p, strlen(p));
-
+	
 	if(!background) 
 	  printf("%s", p);
 
-      if(! subscribe_uri) 
-	send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
-      }	
+	if(! sub_uri) 
+	  send_len = do_packet(buf, COAP_TYPE_ACK, CHANGED_2_04, NULL, NULL, CONTENT_NOT_DEFINED, NULL, co->tkl, tok,0,0);
+      }
 
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -675,6 +705,25 @@ int process(void)
 	  printf("Sent %d bytes to %s:%d\n", send_len, inet_ntoa(si_other.sin_addr), 
 	       ntohs(si_other.sin_port));
 
+      }
+      /* Parse discovery respone */
+      if(dis_uri) {
+	print_date(p); 
+	if(file_fd)
+	  write(file_fd, p, strlen(p));
+	if(!background) 
+	  printf("%s", p);
+	memset((char *) &p, 0, sizeof(p));
+      
+	parse_subscribe(co, recv_len, p);
+	p[strlen(p)] = '\n';
+	
+	if(file_fd)
+	  write(file_fd, p, strlen(p));
+	
+	if(!background) 
+	  printf("%s", p);
+	break;
       }
     }
     close(s);
@@ -698,18 +747,23 @@ int main(int ac, char *av[])
       filename = av[++i];
     else if (strncmp(av[i], "-d", 6) == 0)
       debug = 3;
+    else if (strncmp(av[i], "-dis", 4) == 0) {
+      host = av[++i];
+      dis_uri = av[++i];
+    }
     else if (strncmp(av[i], "-pub", 4) == 0) {
-      publish_uri = av[++i];
+      host = av[++i];
+      pub_uri = av[++i];
       payload = av[++i];
+    }
+    else if (strncmp(av[i], "-sub", 4) == 0) {
+      host = av[++i];
+      sub_uri = av[++i];
+    }
+    else if (strncmp(av[i], "-server", 7) == 0) {
     }
     else if (strncmp(av[i], "-p", 2) == 0)
       port = atoi(av[++i]);
-    else if (strncmp(av[i], "-sub", 4) == 0)
-      subscribe_host = av[++i];
-    else if (strncmp(av[i], "-s", 2) == 0)
-      subscribe_host = av[++i];
-    else if (strncmp(av[i], "-u", 2) == 0)
-      subscribe_uri = av[++i];
     else if (strncmp(av[i], "-b", 2) == 0) 
       background = 1;
   }
@@ -724,9 +778,9 @@ int main(int ac, char *av[])
     printf("DEBUG Unix Time=%d\n", utime);
     printf("DEBUG background=%d\n", background);
     printf("DEBUG file=%s\n", filename);
-    printf("DEBUG subscribe_uri=%s\n", subscribe_uri);
-    printf("DEBUG publish_uri=%s\n", publish_uri);
-    printf("DEBUG subscribe_host=%s\n", subscribe_host);
+    printf("DEBUG sub_uri=%s\n", sub_uri);
+    printf("DEBUG pub_uri=%s\n", pub_uri);
+    printf("DEBUG host=%s\n", host);
   }
 
   if(filename) {
@@ -763,7 +817,6 @@ int main(int ac, char *av[])
     
     signal(SIGCHLD,SIG_IGN); /* ignore child */
   }
-
   process();
   return 0;
 }
