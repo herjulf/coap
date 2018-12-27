@@ -2,17 +2,17 @@
  * Copyright GPL by Robert Olsson roolss@kth.se/robert@radio-sensors.com
  * Created : 2017-02-09
  */
-#include<stdio.h>
-#include<string.h> 
-#include<stdlib.h> 
+#include <stdio.h>
+#include <string.h> 
+#include <stdlib.h> 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
-#include<arpa/inet.h>
-#include<sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include <signal.h>
 
 #define VERSION "1.4 2018-12-25"
@@ -181,22 +181,23 @@ void usage(void)
   printf("  * Verbose protocol and option debugging\n");
   printf("  * Implementation in plain C, no libs, no classes etc\n");
   printf("  * GPL copyright\n");
-  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-sub broker uri [-dis broker uri] ] [-u uri] [-f file]\n");
+  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-f file] [-dis host uri] [-sub host uri] [-pub host uri payload]\n");
   printf(" -f file        -- local logfile. Default is %s\n", LOGFILE);
   printf(" -p port        -- TCP server port. Default %d\n", port);
   printf(" -b             -- run in background\n");
-  printf(" -u             --  uri\n");
-  printf(" -dis host uri  -- discover\n");
-  printf(" -sub host uri  -- subscribe\n");
-  printf(" -pub host uri  -- publish\n");
-  printf(" -server\n");
   printf(" -d             -- debug\n");
   printf(" -ut            -- add Unix time\n");
   printf(" -gmt           -- time in GMT\n");
+  printf(" -dis host uri  -- discover\n");
+  printf(" -sub host uri  -- subscribe\n");
+  printf(" -pub host uri  -- publish\n");
 
-  printf("\nExample 1 -- discover coap:\n coap -dis  192.16.125.232 .well-known/core?rt=core.ps\n");
-  printf("\nExample 2 -- discover coap pubsub:\n coap  -dis 192.16.125.232 .well-known/core\n");
-  printf("\nExample 3 -- subscribe topic:\n coap  -sub 192.16.125.232 .well-known/core?\n");
+  printf("\nExample 1 -- coap discover:\n coap -dis 192.16.125.232 .well-known/core\n");
+  printf("\nExample 2 -- pubsub discover:\n coap -dis 192.16.125.232 .well-known/core?rt=core.ps\n");
+  printf("\nExample 3 -- subscribe a topic:\n coap -sub 192.16.125.232  ps/fcc23d0000017f97/topic1\n");
+  printf("\nExample 4 -- publish on a topic:\n coap -pub 192.16.125.232  ps/fcc23d0000017f97/topic1 200\n");
+  printf("\nExample 5 -- server:\n coap\n");
+  printf("\nExample 6 -- subscribe a topic output stdout:\n coap -f - -sub 192.16.125.232  ps/fcc23d0000017f97/topic1\n");
 
   exit(-1);
 }
@@ -553,7 +554,6 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
       tkl = 2;
-      //send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
       send_len = do_packet(buf, COAP_TYPE_CON, 1, dis_uri, NULL, CONTENT_NOT_DEFINED, NULL, tkl, tok, 0,0);
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -578,7 +578,6 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
       tkl = 2;
-      //send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
       send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, CONTENT_NOT_DEFINED, payload, tkl, tok, 0,0);
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -725,6 +724,11 @@ int process(void)
 	  printf("%s", p);
 	break;
       }
+
+      /* pub respone */
+      if(pub_uri) {
+	break;
+      }
     }
     close(s);
     return 0;
@@ -768,19 +772,24 @@ int main(int ac, char *av[])
       background = 1;
   }
 
+  if(!sub_uri && !pub_uri && !dis_uri)
+    server = "enabled\n";
+
+  
   /* Setup for some radom */
   srand((unsigned int)**main + (unsigned int)&ac + (unsigned int)time(NULL));
   srand(rand());
 
   if(debug) {
+    printf("DEBUG host=%s\n", host);
     printf("DEBUG port=%d\n", port);
     printf("DEBUG GMT=%d\n", gmt);
     printf("DEBUG Unix Time=%d\n", utime);
     printf("DEBUG background=%d\n", background);
     printf("DEBUG file=%s\n", filename);
+    printf("DEBUG dis_uri=%s\n", dis_uri);
     printf("DEBUG sub_uri=%s\n", sub_uri);
     printf("DEBUG pub_uri=%s\n", pub_uri);
-    printf("DEBUG host=%s\n", host);
   }
 
   if(filename) {
