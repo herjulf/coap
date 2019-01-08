@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <signal.h>
 
-#define VERSION "1.5 2018-12-27"
+#define VERSION "1.6 2019-01-08"
 #define BUFLEN 512
 
 #define PORT 5683
@@ -597,7 +597,7 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, CONTENT_NOT_DEFINED, payload, tkl, tok, 0,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, TEXT_PLAIN, payload, tkl, tok, 0,0);
       if(send_len) {
 	if(debug & D_COAP_PKT)
 	  dump_pkt((struct coap_hdr*)buf, send_len, "pub");
@@ -792,7 +792,7 @@ int main(int ac, char *av[])
       utime = 1;
     else if (strncmp(av[i], "-f", 2) == 0) 
       filename = av[++i];
-    else if (strncmp(av[i], "-d", 6) == 0)
+    else if (strncmp(av[i], "-d", 2) == 0)
       debug = 3;
     else if (strncmp(av[i], "-dis", 4) == 0) {
       host = av[++i];
