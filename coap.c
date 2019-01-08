@@ -140,6 +140,7 @@ typedef enum {
 
 unsigned int debug = 0;
 int date = 1, utime =0, gmt=0, background = 0;
+int ct = TEXT_PLAIN;
 
 struct udp_hdr {
  unsigned short int sport;
@@ -198,13 +199,14 @@ void usage(void)
   printf("  * Verbose protocol and option debugging\n");
   printf("  * Implementation in plain C, no libs, no classes etc\n");
   printf("  * GPL copyright\n");
-  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-f file] [-dis host uri] [-sub host uri] [-pub host uri payload]\n");
+  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-f file] [-cf type] [-dis host uri] [-sub host uri] [-pub host uri payload]\n");
   printf(" -f file        -- local logfile. Default is %s\n", LOGFILE);
   printf(" -p port        -- TCP server port. Default %d\n", port);
   printf(" -b             -- run in background\n");
   printf(" -d             -- debug\n");
   printf(" -ut            -- add Unix time\n");
   printf(" -gmt           -- time in GMT\n");
+  printf(" -ct  type      -- content format\n");
   printf(" -dis host uri  -- discover\n");
   printf(" -sub host uri  -- subscribe\n");
   printf(" -pub host uri  -- publish\n");
@@ -573,7 +575,7 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 1, dis_uri, NULL, CONTENT_NOT_DEFINED, NULL, tkl, tok, 0,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, COAP_GET, dis_uri, NULL, CONTENT_NOT_DEFINED, NULL, tkl, tok, 0,0);
       if(send_len) {
 	if(debug & D_COAP_PKT)
 	  dump_pkt((struct coap_hdr*)buf, send_len, "dis");
@@ -597,7 +599,7 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
         tok[i] = rand();
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 3, pub_uri, NULL, TEXT_PLAIN, payload, tkl, tok, 0,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, COAP_PUT, pub_uri, NULL, ct, payload, tkl, tok, 0,0);
       if(send_len) {
 	if(debug & D_COAP_PKT)
 	  dump_pkt((struct coap_hdr*)buf, send_len, "pub");
@@ -621,7 +623,7 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
 	tok[i] = rand();
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 1, sub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, COAP_GET, sub_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 1,0);
       
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -643,7 +645,7 @@ int process(void)
       for (i = 0; i < MAX_TOKEN_LEN; i++)
 	tok[i] = rand();
       tkl = 2;
-      send_len = do_packet(buf, COAP_TYPE_CON, 1, get_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
+      send_len = do_packet(buf, COAP_TYPE_CON, COAP_GET, get_uri, NULL, TEXT_PLAIN, NULL, tkl, tok, 0,0);
       
       if(send_len) {
 	if(debug & D_COAP_PKT)
@@ -686,6 +688,11 @@ int process(void)
       if(co->tkl)
 	memcpy(tok, &buf[4], co->tkl);
 
+
+      if((co->type == COAP_TYPE_ACK))
+	printf("Result code %d\n", co->code);
+
+      
       /* Simple CoAP pubsub state machinery */
 
       /* DISCOVER reply*/
@@ -788,16 +795,18 @@ int main(int ac, char *av[])
       gmt = 1;
     else if (strncmp(av[i], "-h", 2) == 0) 
       usage();
+    else if (strncmp(av[i], "-ct", 3) == 0) 
+      ct = atoi(av[i++]);
     else if (strncmp(av[i], "-ut", 3) == 0) 
       utime = 1;
     else if (strncmp(av[i], "-f", 2) == 0) 
       filename = av[++i];
-    else if (strncmp(av[i], "-d", 2) == 0)
-      debug = 3;
     else if (strncmp(av[i], "-dis", 4) == 0) {
       host = av[++i];
       dis_uri = av[++i];
     }
+    else if (strncmp(av[i], "-d", 2) == 0)
+      debug = 3;
     else if (strncmp(av[i], "-pub", 4) == 0) {
       host = av[++i];
       pub_uri = av[++i];
@@ -834,6 +843,7 @@ int main(int ac, char *av[])
     printf("DEBUG Unix Time=%d\n", utime);
     printf("DEBUG background=%d\n", background);
     printf("DEBUG file=%s\n", filename);
+    printf("DEBUG ct=%d\n", ct);
     printf("DEBUG dis_uri=%s\n", dis_uri);
     printf("DEBUG sub_uri=%s\n", sub_uri);
     printf("DEBUG pub_uri=%s\n", pub_uri);
