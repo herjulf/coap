@@ -190,6 +190,41 @@ struct coap_opt_l {
   unsigned int len:8;   /* MAX_URI_LEN = 50 so one byte is enough for extended length */
 };
 
+char *response(int code)
+{
+  char *r;
+
+  switch(code) {
+
+  case  NO_ERROR : r = "NO_ERROR";  break;
+  case  CREATED_2_01 : r = "CREATED_2_01";  break;
+  case  DELETED_2_02 : r = "DELETED_2_02";  break;
+  case  VALID_2_03 : r = "VALID_2_03";  break;
+  case  CHANGED_2_04 : r = "CHANGED_2_04";  break;
+  case  CONTENT_2_05 : r = "CONTENT_2_05";  break;
+  case  CONTINUE_2_31 : r = "CONTINUE_2_31";  break;
+  case  BAD_REQUEST_4_00 : r = "BAD_REQUEST_4_00";  break;
+  case  UNAUTHORIZED_4_01 : r = "UNAUTHORIZED_4_01";  break;
+  case  BAD_OPTION_4_02 : r = "BAD_OPTION_4_02";  break;
+  case  FORBIDDEN_4_03 : r = "FORBIDDEN_4_03";  break;
+  case  NOT_FOUND_4_04 : r = "NOT_FOUND_4_04";  break;
+  case  METHOD_NOT_ALLOWED_4_05: r = "METHOD_NOT_ALLOWED_4_05";  break;
+  case  NOT_ACCEPTABLE_4_06 : r = "NOT_ACCEPTABLE_4_06";  break;
+  case  PRECONDITION_FAILED_4_12 : r = "PRECONDITION_FAILED_4_12";  break;
+  case  REQUEST_ENTITY_TOO_LARGE_4_13 : r = "REQUEST_ENTITY_TOO_LARGE_4_13";  break;
+  case  UNSUPPORTED_MEDIA_TYPE_4_15 : r = "UNSUPPORTED_MEDIA_TYPE_4_15";  break;
+  case  INTERNAL_SERVER_ERROR_5_00 : r = "INTERNAL_SERVER_ERROR_5_00";  break;
+  case  NOT_IMPLEMENTED_5_01 : r = "NOT_IMPLEMENTED_5_01";  break;
+  case  BAD_GATEWAY_5_02 : r = "BAD_GATEWAY_5_02";  break;
+  case  SERVICE_UNAVAILABLE_5_03  : r = "SERVICE_UNAVAILABLE_5_03";  break;
+  case  GATEWAY_TIMEOUT_5_04 : r = "GATEWAY_TIMEOUT_5_04";  break;
+  case  PROXYING_NOT_SUPPORTED_5_05 : r = "PROXYING_NOT_SUPPORTED_5_05";  break;
+  default:
+    r = "UNKNOWN";
+  }
+  return r;
+}
+
 void usage(void)
 {
   printf("\nVersion %s\n", VERSION);
@@ -690,7 +725,7 @@ int process(void)
 
 
       if((co->type == COAP_TYPE_ACK))
-	printf("Result code %d\n", co->code);
+	printf("%s %d\n", response(co->code), co->code);
 
       
       /* Simple CoAP pubsub state machinery */
