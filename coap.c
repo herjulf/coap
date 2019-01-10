@@ -15,7 +15,7 @@
 #include <sys/socket.h>
 #include <signal.h>
 
-#define VERSION "1.6 2019-01-08"
+#define VERSION "1.7 2019-01-10"
 #define BUFLEN 512
 
 #define PORT 5683
@@ -141,6 +141,7 @@ typedef enum {
 unsigned int debug = 0;
 int date = 1, utime =0, gmt=0, background = 0;
 int ct = TEXT_PLAIN;
+int32_t max_age = 60; /* We use default */
 
 struct udp_hdr {
  unsigned short int sport;
@@ -234,7 +235,7 @@ void usage(void)
   printf("  * Verbose protocol and option debugging\n");
   printf("  * Implementation in plain C, no libs, no classes etc\n");
   printf("  * GPL copyright\n");
-  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-f file] [-cf type] [-dis host uri] [-sub host uri] [-pub host uri payload]\n");
+  printf("\ncoap [-d] [-b] [-p port] [-gmt] [-f file] [-cf type] [-ma time] [-dis host uri] [-sub host uri] [-pub host uri payload]\n");
   printf(" -f file        -- local logfile. Default is %s\n", LOGFILE);
   printf(" -p port        -- TCP server port. Default %d\n", port);
   printf(" -b             -- run in background\n");
@@ -242,6 +243,7 @@ void usage(void)
   printf(" -ut            -- add Unix time\n");
   printf(" -gmt           -- time in GMT\n");
   printf(" -ct  type      -- content format\n");
+  printf(" -ma  time      -- max age in sec\n");
   printf(" -dis host uri  -- discover\n");
   printf(" -sub host uri  -- subscribe\n");
   printf(" -pub host uri  -- publish\n");
@@ -288,7 +290,7 @@ void print_date(char *datebuf)
 void dump_pkt(struct coap_hdr *ch, int len, char *info)
 {
   int i;
-  char *d = (char *) ch; 
+  unsigned char *d = (unsigned char *) ch;
   unsigned ii, opt = 0, old_opt = 0;
 
   printf("DUMP at %s HEAD lengh=%d\n", info, len);
@@ -388,7 +390,12 @@ void dump_pkt(struct coap_hdr *ch, int len, char *info)
 	printf("cf=%d", d[i+1]);
       }
       else if(opt == COAP_OPTION_MAX_AGE) {
-	printf("Max-Age=%u", (d[i+1]<<8) + d[i+2]);
+	if(olen == 1)
+	  printf("Max-Age=%u", (unsigned char) (d[i+1]));
+	else if(olen == 2)
+	  printf("Max-Age=%u", ((uint32_t) ((uint32_t)d[i+1])<<8) + (unsigned char) d[i+2]);
+	else if(olen == 3)
+	  printf("Max-Age=%u", ((uint32_t) ((uint32_t)d[i+1])<<16)  + (((uint32_t)d[i+2])<<8) + (unsigned char) d[i+3]);
       }
     }
     printf("\n");
@@ -551,11 +558,31 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
     ch_os = (struct coap_opt_s*) &buf[len];
     ch_os->delta = COAP_OPTION_MAX_AGE - last_option; /* COAP_OPTION_MAX_AGE = 14 */
     last_option = COAP_OPTION_MAX_AGE;
-    ch_os->len = 1;
-    len++;
-    buf[len] = 11;
-    len++;
-  }  
+    if(max_age <= 255) {
+      ch_os->len = 1;
+      len++;
+      buf[len] = (unsigned char) max_age & 0xFF;
+      len++;
+    }
+    else if(max_age <= 65536) {
+      ch_os->len = 2;
+      len++;
+      buf[len] = (unsigned char) (max_age>>8);
+      len++;
+      buf[len] = (unsigned char) max_age & 0xFF;
+      len++;
+    }
+    else {
+      ch_os->len = 3;
+      len++;
+      buf[len] = (unsigned char) (max_age>>16);
+      len++;
+      buf[len] = (unsigned char) (max_age>>8);
+      len++;
+      buf[len] = (unsigned char) max_age & 0xFF;
+      len++;
+    }
+  }
 
   if(uri_query) {
     ch_os = (struct coap_opt_s*) &buf[len];
@@ -836,6 +863,8 @@ int main(int ac, char *av[])
       utime = 1;
     else if (strncmp(av[i], "-f", 2) == 0) 
       filename = av[++i];
+    else if (strncmp(av[i], "-ma", 3) == 0) 
+      max_age = atoi(av[++i]);
     else if (strncmp(av[i], "-dis", 4) == 0) {
       host = av[++i];
       dis_uri = av[++i];
@@ -879,6 +908,7 @@ int main(int ac, char *av[])
     printf("DEBUG background=%d\n", background);
     printf("DEBUG file=%s\n", filename);
     printf("DEBUG ct=%d\n", ct);
+    printf("DEBUG max_age=%d\n", max_age);
     printf("DEBUG dis_uri=%s\n", dis_uri);
     printf("DEBUG sub_uri=%s\n", sub_uri);
     printf("DEBUG pub_uri=%s\n", pub_uri);
