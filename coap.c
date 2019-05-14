@@ -500,6 +500,7 @@ int do_packet(char *buf, unsigned char type, unsigned char code, char *uri,
   ch_tx->type = type;
   ch_tx->tkl = tkl;
   ch_tx->code = code;
+  ch_tx->id = rand();
 
   if(tkl > MAX_TOKEN_LEN) {
     terminate("CoAP token length err");
